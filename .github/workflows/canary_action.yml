@@ -2,7 +2,10 @@ name: CanaryInTheGrid Daily Monitor
 
 on:
   schedule:
+    # 日本時間の毎朝 06:00 (UTC 21:00) に実行
     - cron: '0 21 * * *'
+  
+  # GitHub画面からの手動実行用トリガー
   workflow_dispatch:
 
 jobs:
@@ -11,10 +14,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4  # ← 最新版 (v4) に換装済み
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5  # ← 最新版 (v5) に換装済み
         with:
           python-version: '3.10'
 
