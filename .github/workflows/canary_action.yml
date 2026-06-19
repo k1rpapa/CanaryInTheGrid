@@ -14,10 +14,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4  # ← 最新版 (v4) に換装済み
+        uses: actions/checkout@v7  # ← Node.js 24完全対応の最新版 (v7)
 
       - name: Set up Python
-        uses: actions/setup-python@v5  # ← 最新版 (v5) に換装済み
+        uses: actions/setup-python@v6  # ← Node.js 24完全対応の最新版 (v6)
         with:
           python-version: '3.10'
 
