@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CanaryInTheGrid v2.0 - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chosen Palette: Warm Neutrals (Stone/Zinc) with Alert Accents (Emerald, Amber, Orange, Rose) -->
+    <!-- Application Structure Plan: The SPA uses a tabbed dashboard structure. The "Dashboard" tab provides an interactive 'Scenario Simulator' allowing users to click through the 4 market alert states to instantly see how the 3 key metrics (Price, Volume, Storage) and historical trends interact to trigger warnings. The "System Logic" tab presents the foundational hypotheses and rationale (Why Energy? What are the indicators?) in a structured, readable layout. This interactive, simulation-first approach makes abstract financial/physical market concepts immediately tangible for the user. -->
+    <!-- Visualization & Content Choices: 
+         1. Alert States -> Goal: Inform & Simulate -> Interactive Status Board -> Users click buttons to change the app's state, updating texts and colors instantly. -> Justification: Active learning through simulation is better than static reading.
+         2. Key Metrics (Price/Volume/Storage) -> Goal: Inform -> Dynamic Stat Cards -> Updates based on selected scenario. -> Justification: Clear, large numbers are essential for a dashboard feel. NO SVG used (Unicode icons instead).
+         3. Trend Analysis -> Goal: Change/Relationships -> Dual-axis Line/Bar Chart (Chart.js) -> Shows a 6-month simulated trend leading to the current scenario. -> Justification: Helps users visualize *how* the market collapses (e.g., volume dropping before price). Library: Chart.js Canvas (NO SVG/Mermaid).
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            background-color: #fafaf9; 
+            color: #1c1917; 
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 40vh;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .tab-active {
+            border-bottom: 2px solid #1c1917;
+            font-weight: bold;
+        }
+        pre.terminal-style {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            line-height: 1.3;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <nav class="bg-stone-200 shadow-sm sticky top-0 z-10">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <span class="text-xl font-bold tracking-tight">🐦 CanaryInTheGrid <span class="text-sm font-normal text-stone-500">v2.0</span></span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="nav-dashboard" class="px-3 py-2 text-sm tab-active transition-colors hover:bg-stone-300 rounded-t-md">ダッシュボード / シミュレーター</button>
+                    <button id="nav-logic" class="px-3 py-2 text-sm text-stone-600 transition-colors hover:bg-stone-300 rounded-t-md">システム・ロジック (解説)</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        
+        <!-- =================== DASHBOARD VIEW =================== -->
+        <section id="view-dashboard" class="block">
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold mb-4">AIバブル崩壊 早期警戒シミュレーター</h1>
+                <p class="text-stone-600 leading-relaxed bg-stone-100 p-4 rounded-lg shadow-sm border border-stone-200">
+                    このダッシュボードは、AIバブルの崩壊を検知する「CanaryInTheGrid」の動作をシミュレートします。金融市場のノイズを無視し、AIインフラの物理的なエネルギー需要（天然ガス市場）を監視します。以下の4つのシナリオボタンをクリックし、システムが市場の異常をどのように判定し、どのようなアラートを発するかを体験してください。
+                </p>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-md overflow-hidden border border-stone-200 mb-8">
+                <div class="p-4 bg-stone-100 border-b border-stone-200 flex flex-wrap gap-2 justify-center">
+                    <button onclick="app.setScenario('normal')" id="btn-normal" class="px-4 py-2 rounded shadow-sm text-sm font-bold bg-white border-2 border-emerald-500 text-emerald-700 hover:bg-emerald-50 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500">🟢 正常 (Normal)</button>
+                    <button onclick="app.setScenario('noise')" id="btn-noise" class="px-4 py-2 rounded shadow-sm text-sm font-bold bg-white border-2 border-amber-400 text-amber-700 hover:bg-amber-50 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500">🟡 ノイズ (False Positive)</button>
+                    <button onclick="app.setScenario('vacuum')" id="btn-vacuum" class="px-4 py-2 rounded shadow-sm text-sm font-bold bg-white border-2 border-orange-500 text-orange-700 hover:bg-orange-50 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500">🟠 真空状態 (Warning)</button>
+                    <button onclick="app.setScenario('collapse')" id="btn-collapse" class="px-4 py-2 rounded shadow-sm text-sm font-bold bg-white border-2 border-rose-600 text-rose-700 hover:bg-rose-50 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500">🔴 崩壊確定 (Collapse)</button>
+                </div>
+
+                <div class="p-6 md:p-8" id="status-board">
+                    <div class="flex flex-col md:flex-row gap-6 items-start">
+                        <div class="w-full md:w-1/3 text-center md:text-left flex flex-col items-center md:items-start justify-center">
+                            <div id="alert-icon" class="text-6xl mb-2">🟢</div>
+                            <h2 id="alert-title" class="text-2xl font-bold text-emerald-700 mb-2">【正常】 バブル継続中</h2>
+                            <span id="alert-badge" class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">監視ステータス</span>
+                        </div>
+                        <div class="w-full md:w-2/3 space-y-4">
+                            <div>
+                                <h3 class="text-sm font-bold text-stone-500 uppercase tracking-wider mb-1">現在の市場状態</h3>
+                                <p id="alert-state" class="text-lg font-medium text-stone-800">価格も取引量も安定しており、在庫も正常。</p>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-stone-500 uppercase tracking-wider mb-1">マクロ的意味</h3>
+                                <p id="alert-meaning" class="text-stone-700">IT企業は計画通りにデータセンターの拡大を進めています。AIバブルの熱狂はまだ続きます。</p>
+                            </div>
+                            <div class="bg-stone-50 p-4 rounded-lg border-l-4 border-emerald-500" id="action-box">
+                                <h3 class="text-sm font-bold text-stone-800 mb-1">🛡️ あなたのアクション</h3>
+                                <p id="alert-action" class="text-stone-700 font-medium">何もしません。今の強気相場を静観してください。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h2 class="text-2xl font-bold mb-4">監視インジケーター (ライブ・モックデータ)</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200 flex flex-col">
+                    <div class="text-sm font-bold text-stone-500 mb-2 flex items-center justify-between">
+                        <span>遠月物 価格 (2〜3年先)</span>
+                        <span class="text-xl">💲</span>
+                    </div>
+                    <div id="metric-price" class="text-3xl font-black text-stone-800 mb-1">$4.50</div>
+                    <div class="text-xs text-stone-500 mt-auto">IT企業の将来のAI需要予測</div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200 flex flex-col">
+                    <div class="text-sm font-bold text-stone-500 mb-2 flex items-center justify-between">
+                        <span>遠月物 出来高 (取引量)</span>
+                        <span class="text-xl">📊</span>
+                    </div>
+                    <div id="metric-volume" class="text-3xl font-black text-stone-800 mb-1">1,250</div>
+                    <div class="text-xs text-stone-500 mt-auto">巨大企業(クジラ)の流動性と市場参加</div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200 flex flex-col">
+                    <div class="text-sm font-bold text-stone-500 mb-2 flex items-center justify-between">
+                        <span>EIA 公式天然ガス在庫</span>
+                        <span class="text-xl">🛢️</span>
+                    </div>
+                    <div id="metric-storage" class="text-3xl font-black text-stone-800 mb-1">3,100 Bcf</div>
+                    <div class="text-xs text-stone-500 mt-auto">全米の物理的なエネルギー需給バランス</div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                <h3 class="text-lg font-bold mb-4 text-center">シミュレーション推移 (過去6ヶ月)</h3>
+                <div class="chart-container">
+                    <canvas id="scenarioChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- =================== LOGIC VIEW =================== -->
+        <section id="view-logic" class="hidden">
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold mb-4">システム・ロジックとマクロ仮説</h1>
+                <p class="text-stone-600 leading-relaxed bg-stone-100 p-4 rounded-lg shadow-sm border border-stone-200">
+                    このセクションでは、CanaryInTheGridがなぜ株式市場そのものではなく「物理的なエネルギー市場」を監視するのか、その根本的な仮説と、各アラートレベルの判断基準となるロジックを解説します。金融市場の欺瞞を見抜くための理論的背景です。
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <div class="space-y-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                        <h2 class="text-xl font-bold mb-3 border-b-2 border-stone-100 pb-2 flex items-center"><span class="mr-2">⚡</span>なぜ「エネルギー」を監視するのか？</h2>
+                        <p class="text-stone-700 leading-relaxed mb-4">
+                            過去のITバブルやソフトウェアの進化と異なり、今回の生成AI（ChatGPTなど）には決定的な違いがあります。それは<strong>「莫大な電力（エネルギー）を消費する物理的なインフラ」</strong>が必要だという点です。
+                        </p>
+                        <p class="text-stone-700 leading-relaxed mb-4">
+                            巨大IT企業（Google, Microsoft, Amazonなど）が「AIは今後も無限に成長する」と本気で信じているなら、彼らは数年先のデータセンターを動かすために、今のうちから将来の電力を血眼になって買い漁っているはずです。
+                        </p>
+                        <p class="text-stone-700 leading-relaxed font-medium bg-stone-50 p-3 rounded">
+                            逆に言えば、「もし彼らが将来の電力（エネルギー）の確保をやめたなら、それはAIの成長限界（バブルの崩壊）を意味する」というのが、我々の仮説です。
+                        </p>
+                        <p class="text-stone-700 leading-relaxed mt-4">
+                            米国において、データセンターを動かす電力の根本的なベース燃料は「天然ガス」です。そのため、このシステムは天然ガス市場の動きをAI需要の「炭鉱のカナリア」として利用しています。
+                        </p>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                        <h2 class="text-xl font-bold mb-3 border-b-2 border-stone-100 pb-2 flex items-center"><span class="mr-2">📡</span>監視する3つのコア指標</h2>
+                        <ul class="space-y-4">
+                            <li class="flex items-start">
+                                <span class="bg-stone-200 text-stone-800 rounded-full w-6 h-6 flex items-center justify-center font-bold text-sm mr-3 flex-shrink-0 mt-0.5">1</span>
+                                <div>
+                                    <strong class="block text-stone-800">天然ガスの「遠月物（2〜3年先）」の価格</strong>
+                                    <span class="text-sm text-stone-600">今の価格ではなく、「2年先の価格」を見ます。IT企業が将来のAI需要を見越して動いているかを測るためです。</span>
+                                </div>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="bg-stone-200 text-stone-800 rounded-full w-6 h-6 flex items-center justify-center font-bold text-sm mr-3 flex-shrink-0 mt-0.5">2</span>
+                                <div>
+                                    <strong class="block text-stone-800">遠月物市場の「出来高（取引量）」</strong>
+                                    <span class="text-sm text-stone-600">巨大企業（クジラ）が実際に市場でお金を動かしているか（流動性）を見ます。価格操作を見抜く鍵です。</span>
+                                </div>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="bg-stone-200 text-stone-800 rounded-full w-6 h-6 flex items-center justify-center font-bold text-sm mr-3 flex-shrink-0 mt-0.5">3</span>
+                                <div>
+                                    <strong class="block text-stone-800">米国の「天然ガス在庫（EIA公式データ）」</strong>
+                                    <span class="text-sm text-stone-600">実際に全米でガスが余っているのか、足りていないのかという「絶対的な事実（マクロデータ）」を見ます。</span>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                    <h2 class="text-xl font-bold mb-4 border-b-2 border-stone-100 pb-2">アラート判定マトリックス</h2>
+                    <p class="text-sm text-stone-600 mb-6">システムは取得したデータに基づき、以下の4段階で市場のフェーズを判定します。</p>
+                    
+                    <div class="space-y-4">
+                        <div class="border border-emerald-200 bg-emerald-50 rounded-lg p-4 relative overflow-hidden">
+                            <div class="absolute top-0 left-0 w-2 h-full bg-emerald-500"></div>
+                            <h3 class="font-bold text-emerald-800 flex items-center"><span class="mr-2">🟢</span> 【正常】 バブル継続中</h3>
+                            <p class="text-sm text-emerald-700 mt-1"><strong>状態:</strong> 価格も取引量も安定しており、在庫も正常。<br><strong>意味:</strong> IT企業は計画通りにデータセンターの拡大を進めています。</p>
+                        </div>
+
+                        <div class="border border-amber-200 bg-amber-50 rounded-lg p-4 relative overflow-hidden">
+                            <div class="absolute top-0 left-0 w-2 h-full bg-amber-400"></div>
+                            <h3 class="font-bold text-amber-800 flex items-center"><span class="mr-2">🟡</span> 【偽陽性】 ノイズ検知</h3>
+                            <p class="text-sm text-amber-700 mt-1"><strong>状態:</strong> 価格だけが異常に下がったが、取引量は減っていない。<br><strong>意味:</strong> 一時的な金融市場のノイズや投機的な動きです。構造的な崩壊ではありません。</p>
+                        </div>
+
+                        <div class="border border-orange-200 bg-orange-50 rounded-lg p-4 relative overflow-hidden">
+                            <div class="absolute top-0 left-0 w-2 h-full bg-orange-500"></div>
+                            <h3 class="font-bold text-orange-800 flex items-center"><span class="mr-2">🟠</span> 【真空状態】 早期警戒シグナル</h3>
+                            <p class="text-sm text-orange-700 mt-1"><strong>状態:</strong> 価格は高いまま維持されているが、<strong>「出来高（取引量）」が急減</strong>している。<br><strong>意味:</strong> 危険な状態です。買い手は逃亡していますが、パニック売りが始まっておらず見せかけの価格が浮いています。暴落前夜です。</p>
+                        </div>
+
+                        <div class="border border-rose-200 bg-rose-50 rounded-lg p-4 relative overflow-hidden">
+                            <div class="absolute top-0 left-0 w-2 h-full bg-rose-600"></div>
+                            <h3 class="font-bold text-rose-800 flex items-center"><span class="mr-2">🔴</span> 【崩壊確定】 フル・ショート準備</h3>
+                            <p class="text-sm text-rose-700 mt-1"><strong>状態:</strong> 価格が採算ラインを割り込み、出来高も消滅。さらに「在庫のダブつき」まで確認された状態。<br><strong>意味:</strong> AI需要のウソが完全に暴かれました。巨大IT企業はインフラ投資から手を引き、遠からず市場全体に巨大な暴落が波及します。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 追加: マクロ・スタックトレース（アーキテクチャ図） -->
+            <div class="bg-stone-900 p-6 md:p-8 rounded-xl shadow-md border border-stone-700 mb-8 overflow-x-auto">
+                <h2 class="text-xl font-bold mb-4 border-b-2 border-stone-700 pb-3 text-stone-100 flex items-center"><span class="mr-2">⚙️</span>システムの最終実行フロー（アーキテクチャと閾値）</h2>
+                <p class="text-stone-400 text-sm mb-4">バックエンドで稼働している判定ロジックと発火の「閾値」の全体図です。価格（Trigger）と流動性（Authentication）を並列で監視し、偽のシグナルを徹底的に排除します。</p>
+<pre class="terminal-style text-xs md:text-sm text-emerald-400 bg-black p-4 rounded-lg">
+=========================================================================
+           [ CanaryInTheGrid v2.0 - Final Execution Stack ]
+=========================================================================
+
+[ PARALLEL MONITORING LAYER (並列監視レイヤー) ]
+
+   (Phase 1: The Trigger)                 (Phase 2: The Authentication)
+   物理インフラ限界・採算の死                 流動性の消失・クジラの逃亡
+   │                                      │
+   ├─▶ [PJM ヒートレート < 7.0] ──┐         ├─▶ [遠月物 出来高の急減] ──┐
+   │     (3ヶ月連続割れ)         │         │   (長期ヘッジの枯渇)      │
+   OR                           AND      AND                       AND
+   │                            │         │                         │
+   ├─▶ [PJM vs ERCOT > 15%]  ──┘         ├─▶ [遠月物 コンタンゴ化] ──┘
+   │     (恒常的プレミアム)                 │     (カーブ全体の下方シフト)
+
+                   │                               │
+                   └──────────────┬────────────────┘
+                                  ▼
+[ MATRIX EVALUATION GATEWAY (状態判定マトリックス) ]
+
+   🔴 [Phase 1 発火] & [Phase 2 発火] ＝ 崩壊確定 (即座にPhase 3へ移行)
+   🟠 [Phase 1 正常] & [Phase 2 発火] ＝ 真空状態 (暴落前夜。Phase 3へ移行)
+   🟡 [Phase 1 発火] & [Phase 2 正常] ＝ 偽陽性・ノイズ (待機・システムリセット)
+   🟢 [Phase 1 正常] & [Phase 2 正常] ＝ バブル継続中 (監視継続)
+
+                                  │
+                                  ▼ (🔴 または 🟠 の場合のみゲート開放)
+
+[ PHASE 3: MACRO FAILSAFE LAYER (マクロの裏付け) ]
+   │
+   ├─▶ CFTC (建玉明細): コマーシャルズ（実需の大口）長期ヘッジ買い消失を確認
+   │
+   └─▶ EIA (エネルギー情報局): 季節外れの天然ガス在庫の異常な積み上がりを確認
+
+                                  │
+                                  ▼ (フェイルセーフ解除・最終承認)
+
+[ PHASE 4: EXECUTION LAYER (執行) ]
+   │
+   └─▶ 🎯 TARGET LOCKED: NASDAQ100 (QQQ)
+         [ 執行モード: インデックス・ショート、またはプット・オプション展開 ]
+
+=========================================================================
+</pre>
+            </div>
+            
+            <div class="bg-stone-800 text-stone-100 p-6 rounded-xl text-center shadow-md">
+                <p class="font-medium text-lg mb-2">「このシステムは明日株が上がるか下がるかを当てるものではありません。」</p>
+                <p class="text-stone-300 text-sm">数年先の物理インフラの限界から「地殻変動（トレンドの完全な転換点）」を捉えるためのレーダーです。いつか必ず「🟠」や「🔴」が点灯する日が来ます。その時、ウォール街の誰よりも早く、あなたはこのアラートの本当の価値を知ることになります。</p>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        const app = {
+            currentScenario: 'normal',
+            chartInstance: null,
+            scenarios: {
+                normal: {
+                    colorClass: 'text-emerald-700',
+                    bgBadge: 'bg-emerald-100',
+                    borderBadge: 'border-emerald-200',
+                    boxBorder: 'border-emerald-500',
+                    icon: '🟢',
+                    title: '【正常】 バブル継続中',
+                    state: '価格も取引量も安定しており、在庫も正常。',
+                    meaning: 'IT企業は計画通りにデータセンターの拡大を進めています。AIバブルの熱狂はまだ続きます。',
+                    action: '何もしません。今の強気相場を静観してください。',
+                    metricPrice: '$4.50',
+                    metricVolume: '1,250',
+                    metricStorage: '3,100 Bcf',
+                    chartData: {
+                        labels: ['M-5', 'M-4', 'M-3', 'M-2', 'M-1', '現在'],
+                        price: [4.2, 4.4, 4.3, 4.5, 4.6, 4.50],
+                        volume: [1100, 1200, 1150, 1300, 1250, 1250]
+                    }
+                },
+                noise: {
+                    colorClass: 'text-amber-700',
+                    bgBadge: 'bg-amber-100',
+                    borderBadge: 'border-amber-200',
+                    boxBorder: 'border-amber-400',
+                    icon: '🟡',
+                    title: '【偽陽性】 ノイズ検知',
+                    state: '価格だけが異常に下がったが、取引量は減っていない。',
+                    meaning: '一時的な金融市場のノイズや投機的な動きです。構造的な崩壊ではありません。',
+                    action: '何もしません。システムがノイズを弾いた証拠です。',
+                    metricPrice: '$2.10',
+                    metricVolume: '1,300',
+                    metricStorage: '3,150 Bcf',
+                    chartData: {
+                        labels: ['M-5', 'M-4', 'M-3', 'M-2', 'M-1', '現在'],
+                        price: [4.3, 4.5, 4.6, 4.5, 4.4, 2.10],
+                        volume: [1150, 1300, 1250, 1250, 1280, 1300]
+                    }
+                },
+                vacuum: {
+                    colorClass: 'text-orange-700',
+                    bgBadge: 'bg-orange-100',
+                    borderBadge: 'border-orange-200',
+                    boxBorder: 'border-orange-500',
+                    icon: '🟠',
+                    title: '【真空状態】 早期警戒シグナル',
+                    state: '価格は高いまま維持されているが、「出来高（取引量）」が急減している。',
+                    meaning: '非常に危険な状態です。巨大企業（買い手）はすでに市場から逃亡していますが、まだパニック売りが始まっておらず、見せかけの価格だけが宙に浮いています。「床が抜け落ちる直前」です。',
+                    action: '暴落への警戒を強めてください。利益確定の準備や、下落を見越したポジション（空売りなど）の検討を始めるタイミングです。',
+                    metricPrice: '$4.40',
+                    metricVolume: '350',
+                    metricStorage: '3,300 Bcf',
+                    chartData: {
+                        labels: ['M-5', 'M-4', 'M-3', 'M-2', 'M-1', '現在'],
+                        price: [4.5, 4.6, 4.5, 4.6, 4.5, 4.40],
+                        volume: [1250, 1250, 1100, 800, 400, 350]
+                    }
+                },
+                collapse: {
+                    colorClass: 'text-rose-700',
+                    bgBadge: 'bg-rose-100',
+                    borderBadge: 'border-rose-200',
+                    boxBorder: 'border-rose-600',
+                    icon: '🔴',
+                    title: '【崩壊確定】 フル・ショート準備',
+                    state: '価格が採算ラインを割り込み、出来高も消滅。さらに「在庫のダブつき」まで確認された状態。',
+                    meaning: 'AI需要のウソが完全に暴かれました。巨大IT企業はインフラ投資から手を引き、エネルギーは余り始めています。遠からず、NASDAQ（ハイテク株）市場全体に巨大な暴落が波及します。',
+                    action: 'NASDAQ100などのAI関連銘柄の暴落に備えた防衛、あるいは下落から利益を得るための行動（ショート）を実行する最終段階です。',
+                    metricPrice: '$1.80',
+                    metricVolume: '150',
+                    metricStorage: '3,800 Bcf',
+                    chartData: {
+                        labels: ['M-5', 'M-4', 'M-3', 'M-2', 'M-1', '現在'],
+                        price: [4.6, 4.5, 4.4, 3.2, 2.5, 1.80],
+                        volume: [1250, 1100, 800, 400, 200, 150]
+                    }
+                }
+            },
+
+            init() {
+                this.bindNavigation();
+                this.initChart();
+                this.setScenario('normal');
+            },
+
+            bindNavigation() {
+                const navDash = document.getElementById('nav-dashboard');
+                const navLogic = document.getElementById('nav-logic');
+                const viewDash = document.getElementById('view-dashboard');
+                const viewLogic = document.getElementById('view-logic');
+
+                navDash.addEventListener('click', () => {
+                    navDash.classList.add('tab-active', 'text-stone-900');
+                    navDash.classList.remove('text-stone-600');
+                    navLogic.classList.remove('tab-active', 'text-stone-900');
+                    navLogic.classList.add('text-stone-600');
+                    viewDash.classList.remove('hidden');
+                    viewLogic.classList.add('hidden');
+                });
+
+                navLogic.addEventListener('click', () => {
+                    navLogic.classList.add('tab-active', 'text-stone-900');
+                    navLogic.classList.remove('text-stone-600');
+                    navDash.classList.remove('tab-active', 'text-stone-900');
+                    navDash.classList.add('text-stone-600');
+                    viewLogic.classList.remove('hidden');
+                    viewDash.classList.add('hidden');
+                });
+            },
+
+            initChart() {
+                const ctx = document.getElementById('scenarioChart').getContext('2d');
+                this.chartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: '遠月物 価格 ($/MMBtu)',
+                                data: [],
+                                borderColor: '#1c1917',
+                                backgroundColor: '#1c1917',
+                                borderWidth: 3,
+                                type: 'line',
+                                yAxisID: 'y',
+                                tension: 0.3
+                            },
+                            {
+                                label: '遠月物 出来高',
+                                data: [],
+                                backgroundColor: 'rgba(168, 162, 158, 0.5)',
+                                borderColor: 'rgba(168, 162, 158, 1)',
+                                borderWidth: 1,
+                                type: 'bar',
+                                yAxisID: 'y1'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        scales: {
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                title: { display: true, text: '価格 ($)' },
+                                suggestedMin: 0,
+                                suggestedMax: 6
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                title: { display: true, text: '出来高' },
+                                grid: { drawOnChartArea: false },
+                                suggestedMin: 0,
+                                suggestedMax: 1500
+                            }
+                        },
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) { label += ': '; }
+                                        if (context.parsed.y !== null) {
+                                            label += context.dataset.yAxisID === 'y' ? '$' + context.parsed.y.toFixed(2) : context.parsed.y;
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            },
+
+            setScenario(key) {
+                this.currentScenario = key;
+                const data = this.scenarios[key];
+
+                const buttons = ['btn-normal', 'btn-noise', 'btn-vacuum', 'btn-collapse'];
+                buttons.forEach(btnId => {
+                    document.getElementById(btnId).classList.remove('ring-2', 'ring-offset-2');
+                });
+                document.getElementById(`btn-${key}`).classList.add('ring-2', 'ring-offset-2');
+
+                document.getElementById('alert-icon').textContent = data.icon;
+                
+                const titleEl = document.getElementById('alert-title');
+                titleEl.textContent = data.title;
+                titleEl.className = `text-2xl font-bold mb-2 ${data.colorClass}`;
+
+                const badgeEl = document.getElementById('alert-badge');
+                badgeEl.className = `inline-block px-3 py-1 rounded-full text-xs font-bold border ${data.bgBadge} ${data.colorClass} ${data.borderBadge}`;
+
+                document.getElementById('alert-state').textContent = data.state;
+                document.getElementById('alert-meaning').textContent = data.meaning;
+                document.getElementById('alert-action').textContent = data.action;
+
+                const actionBox = document.getElementById('action-box');
+                actionBox.className = `bg-stone-50 p-4 rounded-lg border-l-4 ${data.boxBorder}`;
+
+                document.getElementById('metric-price').textContent = data.metricPrice;
+                document.getElementById('metric-volume').textContent = data.metricVolume;
+                document.getElementById('metric-storage').textContent = data.metricStorage;
+
+                this.chartInstance.data.labels = data.chartData.labels;
+                this.chartInstance.data.datasets[0].data = data.chartData.price;
+                this.chartInstance.data.datasets[1].data = data.chartData.volume;
+                this.chartInstance.update();
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => app.init());
+    </script>
+</body>
+</html>
