@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CanaryTerminal v3.6 Spatio-Temporal</title>
+    <title>CanaryTerminal v3.7 Tactical Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -15,11 +15,11 @@
 <body class="min-h-screen flex flex-col antialiased">
 
     <!-- 1. Global Navigation & GCP ID Input -->
-    <nav class="bg-stone-950 border-b border-stone-800 text-stone-100 sticky top-0 z-50">
+    <nav class="bg-stone-950 border-b border-stone-800 text-stone-100 sticky top-0 z-50 shadow-md">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between h-auto sm:h-16 items-center py-3 sm:py-0">
             <div class="flex items-center mb-3 sm:mb-0">
-                <span class="text-sm font-black tracking-widest text-stone-100">🐦 CANARY TERMINAL v3.6</span>
-                <span class="text-[9px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded-full ml-3 font-mono">LIVE SCRAPER</span>
+                <span class="text-sm font-black tracking-widest text-stone-100">🐦 CANARY TERMINAL v3.7</span>
+                <span class="text-[9px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded-full ml-3 font-mono">TACTICAL UI</span>
             </div>
             <div class="flex items-center space-x-2">
                 <input type="text" id="gcp-project-id" placeholder="GCPプロジェクトID" class="bg-stone-900 border border-stone-800 text-xs text-stone-200 px-3 py-1.5 rounded-lg font-mono">
@@ -30,7 +30,18 @@
 
     <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
         
-        <!-- 2. Simulation Controller -->
+        <!-- NEW: Tactical Advisory (Hero Section) -->
+        <div class="bg-stone-900/80 border-2 border-stone-700 p-4 sm:p-6 rounded-2xl mb-6 shadow-2xl relative overflow-hidden">
+            <!-- Dynamic Accent Line -->
+            <div id="status-accent" class="absolute top-0 left-0 w-2 h-full bg-stone-500 transition-colors duration-500"></div>
+            
+            <span class="text-[10px] font-black text-stone-500 uppercase tracking-widest block mb-1 ml-3">TACTICAL ADVISORY (サマリー)</span>
+            <div id="kpi-status" class="text-lg sm:text-xl font-bold text-stone-200 ml-3 leading-relaxed transition-colors duration-500">
+                データをロードしてください。
+            </div>
+        </div>
+
+        <!-- Simulation Controller -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
             <button onclick="app.useSimulation('normal')" id="btn-normal" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-emerald-400 border-l-4 border-l-emerald-500 hover:bg-stone-800 transition-colors shadow">🟢 正常: プレミアム維持</button>
             <button onclick="app.useSimulation('noise')" id="btn-noise" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-amber-400 border-l-4 border-l-amber-500 hover:bg-stone-800 transition-colors shadow">🟡 ノイズ: 一時的低下</button>
@@ -38,7 +49,7 @@
             <button onclick="app.useSimulation('collapse')" id="btn-collapse" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-rose-400 border-l-4 border-l-rose-500 hover:bg-stone-800 transition-colors shadow">🔴 崩壊: プレミアム剥落</button>
         </div>
 
-        <!-- 3. Visual Radar (3 Main Charts) -->
+        <!-- Visual Radar (3 Main Charts) -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
             <!-- Chart ①: Band Mean HR Time-Series -->
             <div class="glass-panel p-4 rounded-2xl flex flex-col">
@@ -68,25 +79,26 @@
             </div>
         </div>
 
-        <!-- 4. Tactical KPI Board -->
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-4" id="kpi-board">
-            <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl shadow-inner">
-                <span class="text-[10px] text-stone-500 font-bold block tracking-wider">SLOPE (m)</span>
-                <div id="kpi-slope" class="text-xl sm:text-2xl font-mono font-black text-amber-400 mt-1">---</div>
-            </div>
-            <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl shadow-inner">
+        <!-- Tactical KPI Board (Reordered) -->
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4" id="kpi-board">
+            <!-- REORDERED: HR first to match Chart 1 -->
+            <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl shadow-inner text-center sm:text-left">
                 <span class="text-[10px] text-stone-500 font-bold block tracking-wider">MEAN PJM HR</span>
-                <div id="kpi-hr" class="text-xl sm:text-2xl font-mono font-black text-stone-100 mt-1">---</div>
+                <div id="kpi-hr" class="text-2xl sm:text-3xl font-mono font-black text-stone-100 mt-1">---</div>
             </div>
-            <div class="bg-stone-950 border border-cyan-900/50 p-4 rounded-xl relative overflow-hidden shadow-inner">
+            
+            <!-- REORDERED: Slope second to match Chart 2 -->
+            <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl shadow-inner text-center sm:text-left">
+                <span class="text-[10px] text-stone-500 font-bold block tracking-wider">SLOPE (m)</span>
+                <div id="kpi-slope" class="text-2xl sm:text-3xl font-mono font-black text-amber-400 mt-1">---</div>
+            </div>
+            
+            <!-- Spread third to match Chart 3 -->
+            <div class="bg-stone-950 border border-cyan-900/50 p-4 rounded-xl relative overflow-hidden shadow-inner text-center sm:text-left col-span-2 md:col-span-1">
                 <div class="absolute top-0 right-0 w-1.5 h-full bg-cyan-500/50"></div>
                 <span class="text-[10px] text-cyan-500 font-bold block tracking-wider">PREMIUM SPREAD</span>
-                <div id="kpi-spread" class="text-xl sm:text-2xl font-mono font-black text-cyan-400 mt-1">---</div>
-                <span class="text-[9px] text-stone-600 absolute bottom-2 right-4">TH: 15.0%</span>
-            </div>
-            <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl col-span-2 shadow-inner">
-                <span class="text-[10px] text-stone-500 font-bold block tracking-wider">TACTICAL ADVISORY</span>
-                <div id="kpi-status" class="text-xs font-bold text-stone-300 mt-2 leading-relaxed">データをロードしてください。</div>
+                <div id="kpi-spread" class="text-2xl sm:text-3xl font-mono font-black text-cyan-400 mt-1">---</div>
+                <span class="text-[9px] text-stone-600 absolute bottom-2 right-4 hidden sm:block">TH: 15.0%</span>
             </div>
         </div>
     </main>
@@ -104,63 +116,95 @@
             },
 
             initCharts() {
+                // FIXED: Common X-axis configuration to show dates
+                const commonXAxisOptions = {
+                    display: true,
+                    grid: { color: 'rgba(120, 113, 108, 0.05)' },
+                    ticks: { 
+                        color: '#78716c', 
+                        font: { size: 9 },
+                        maxRotation: 45,
+                        minRotation: 45,
+                        maxTicksLimit: 10 // Prevent label crowding
+                    }
+                };
+
+                // Chart ①: Heat Rate Time-Series
                 const ctxHr = document.getElementById('hrChart').getContext('2d');
                 this.hrChart = new Chart(ctxHr, {
                     type: 'line',
                     data: {
-                        labels: Array(60).fill(0).map((_, i) => `D${i+1}`),
+                        labels: [],
                         datasets: [
                             { label: 'PJM バンド平均 HR', data: [], borderColor: '#f5f5f4', borderWidth: 2, pointRadius: 1, tension: 0.2 },
-                            { label: '採算臨界線', data: Array(60).fill(7.0), borderColor: 'rgba(239, 68, 68, 0.5)', borderDash: [4, 4], borderWidth: 1, pointRadius: 0 }
+                            { label: '採算臨界線', data: [], borderColor: 'rgba(239, 68, 68, 0.5)', borderDash: [4, 4], borderWidth: 1, pointRadius: 0 }
                         ]
                     },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { min: 5.5, max: 9.0, grid: { color: 'rgba(120, 113, 108, 0.1)' }, ticks: { color: '#a8a29e', font: { size: 10 } } } } }
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, 
+                        plugins: { legend: { display: false } }, 
+                        scales: { 
+                            x: commonXAxisOptions, // ENABLED X-AXIS
+                            y: { min: 5.5, max: 9.0, grid: { color: 'rgba(120, 113, 108, 0.1)' }, ticks: { color: '#a8a29e', font: { size: 10 } } } 
+                        } 
+                    }
                 });
 
+                // Chart ②: Slope Time-Series
                 const ctxSlope = document.getElementById('slopeChart').getContext('2d');
                 this.slopeChart = new Chart(ctxSlope, {
                     type: 'line',
                     data: {
-                        labels: Array(60).fill(0).map((_, i) => `D${i+1}`),
+                        labels: [],
                         datasets: [
                             { label: 'PJM カーブ傾き (m)', data: [], borderColor: '#fbbf24', borderWidth: 2, pointRadius: 2, pointHoverRadius: 6, tension: 0.1 },
-                            { label: 'フラット臨界線', data: Array(60).fill(0), borderColor: 'rgba(239, 68, 68, 0.5)', borderDash: [4, 4], borderWidth: 1, pointRadius: 0 }
+                            { label: 'フラット臨界線', data: [], borderColor: 'rgba(239, 68, 68, 0.5)', borderDash: [4, 4], borderWidth: 1, pointRadius: 0 }
                         ]
                     },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { min: -0.15, max: 0.15, grid: { color: 'rgba(120, 113, 108, 0.1)' }, ticks: { color: '#a8a29e', font: { size: 10 } } } } }
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, 
+                        plugins: { legend: { display: false } }, 
+                        scales: { 
+                            x: commonXAxisOptions, // ENABLED X-AXIS
+                            y: { min: -0.15, max: 0.15, grid: { color: 'rgba(120, 113, 108, 0.1)' }, ticks: { color: '#a8a29e', font: { size: 10 } } } 
+                        } 
+                    }
                 });
 
+                // Chart ③: Cross-Sectional Spread
                 const ctxCs = document.getElementById('crossSectionChart').getContext('2d');
                 this.csChart = new Chart(ctxCs, {
                     type: 'line',
                     data: {
                         labels: this.xMonths.map(m => `${m}M`),
                         datasets: [
-                            { label: 'PJM (AI特区)', data: [], borderColor: '#ea580c', backgroundColor: 'rgba(234, 88, 12, 0.15)', borderWidth: 2, pointRadius: 3, fill: true, order: 2 },
-                            { label: 'ERCOT (一般)', data: [], borderColor: '#06b6d4', backgroundColor: 'rgba(6, 182, 212, 0.05)', borderWidth: 2, borderDash: [4, 4], pointRadius: 2, fill: true, order: 3 },
-                            { label: '1次近似直線', data: [], type: 'line', borderColor: '#d6d3d1', borderWidth: 1.5, pointRadius: 0, fill: false, order: 1 }
+                            { label: 'PJM (AI特区)', data: [], borderColor: '#ea580c', backgroundColor: 'rgba(234, 88, 12, 0.15)', borderWidth: 2, pointRadius: 3, fill: true, order: 1 },
+                            { label: 'ERCOT (一般)', data: [], borderColor: '#06b6d4', backgroundColor: 'rgba(6, 182, 212, 0.05)', borderWidth: 2, borderDash: [4, 4], pointRadius: 2, fill: true, order: 2 }
+                            // FIXED: Removed the linear regression line dataset as requested
                         ]
                     },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#a8a29e', boxWidth: 12, font: { size: 10 } } } }, scales: { x: { grid: { color: 'rgba(120, 113, 108, 0.1)' }, ticks: { color: '#a8a29e', font: { size: 10 } } }, y: { min: 4.5, max: 9.5, grid: { color: 'rgba(120, 113, 108, 0.1)' }, ticks: { color: '#a8a29e', font: { size: 10 } } } } }
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, 
+                        plugins: { legend: { labels: { color: '#a8a29e', boxWidth: 12, font: { size: 10 } } } }, 
+                        scales: { 
+                            x: { grid: { color: 'rgba(120, 113, 108, 0.1)' }, ticks: { color: '#a8a29e', font: { size: 10 } } }, 
+                            y: { min: 4.5, max: 9.5, grid: { color: 'rgba(120, 113, 108, 0.1)' }, ticks: { color: '#a8a29e', font: { size: 10 } } } 
+                        } 
+                    }
                 });
             },
 
             bindChartInteractions() {
+                // Time travel capability linked to the slope chart
                 document.getElementById('slopeChart').onclick = (evt) => {
                     const points = this.slopeChart.getElementsAtEventForMode(evt, 'index', { intersect: false }, true);
                     if (points.length > 0 && this.rawHistoryDocuments.length > 0) {
                         this.updateCrossSectionFromHistory(points[0].index);
                     }
                 };
-            },
-
-            calcLinearRegression(xArr, yArr) {
-                const n = xArr.length;
-                let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-                for (let i = 0; i < n; i++) { sumX+=xArr[i]; sumY+=yArr[i]; sumXY+=xArr[i]*yArr[i]; sumXX+=xArr[i]*xArr[i]; }
-                const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-                const intercept = (sumY - slope * sumX) / n;
-                return { slope, intercept };
             },
 
             async loadLiveDatabase() {
@@ -174,19 +218,14 @@
                 
                 try {
                     const res = await fetch(restUrl);
-                    if (!res.ok) throw new Error("Firestore Connection Failed. セキュリティルールが「allow read: if true;」になっているか確認してください。");
+                    if (!res.ok) throw new Error("Firestore Connection Failed.");
                     const data = await res.json();
                     
                     if(!data.documents || data.documents.length === 0) { alert("データベースが空です。"); btn.textContent = "📡 実戦データ同期"; return; }
                     
                     this.rawHistoryDocuments = data.documents.map(d => {
                         const f = d.fields;
-                        
-                        // SAFE PARSING LOGIC: Checks if 'curve_data' exists instead of 'curve'
-                        // and handles potential missing mapValue
                         let curveObj = {};
-                        
-                        // v3.6 Python code saves as "curve_data", not "curve"
                         const curveDataField = f.curve_data || f.curve; 
                         
                         if (curveDataField && curveDataField.mapValue && curveDataField.mapValue.fields) {
@@ -195,8 +234,14 @@
                             }
                         }
 
+                        // Parse the date nicely for the x-axis
+                        let rawDate = f.timestamp_jst ? f.timestamp_jst.stringValue : (f.timestamp ? f.timestamp.stringValue : "");
+                        // Expected format: YYYY-MM-DD HH:MM:SS -> Extract MM-DD
+                        let shortDate = rawDate ? rawDate.substring(5, 10) : "N/A";
+
                         return {
-                            timestamp: f.timestamp_jst ? f.timestamp_jst.stringValue : (f.timestamp ? f.timestamp.stringValue : "Unknown"),
+                            timestamp_raw: rawDate,
+                            date_short: shortDate,
                             slope: f.slope ? parseFloat(f.slope.doubleValue || f.slope.integerValue) : 0,
                             band_mean_hr: f.band_mean_hr ? parseFloat(f.band_mean_hr.doubleValue || f.band_mean_hr.integerValue) : 0,
                             band_mean_spread: f.band_mean_spread ? parseFloat(f.band_mean_spread.doubleValue || f.band_mean_spread.integerValue) : 0,
@@ -216,14 +261,17 @@
 
             renderLiveHistory() {
                 const displayData = this.rawHistoryDocuments.slice(-60);
-                const labels = displayData.map(d => d.timestamp.split(' ')[0]);
+                // FIXED: Use the short date format (MM-DD) for X-axis labels
+                const labels = displayData.map(d => d.date_short);
                 
                 this.hrChart.data.labels = labels;
                 this.hrChart.data.datasets[0].data = displayData.map(d => d.band_mean_hr);
+                this.hrChart.data.datasets[1].data = Array(displayData.length).fill(7.0);
                 this.hrChart.update();
 
                 this.slopeChart.data.labels = labels;
                 this.slopeChart.data.datasets[0].data = displayData.map(d => d.slope);
+                this.slopeChart.data.datasets[1].data = Array(displayData.length).fill(0);
                 this.slopeChart.update();
                 
                 this.updateCrossSectionFromHistory(displayData.length - 1);
@@ -239,64 +287,99 @@
                 
                 this.csChart.data.datasets[0].data = pjmY;
                 this.csChart.data.datasets[1].data = ercotY;
-                
-                const reg = this.calcLinearRegression(this.xMonths, pjmY);
-                this.csChart.data.datasets[2].data = [
-                    { x: "12M", y: reg.slope * 12 + reg.intercept },
-                    { x: "24M", y: reg.slope * 24 + reg.intercept }
-                ];
                 this.csChart.update();
                 
-                document.getElementById('kpi-slope').textContent = (dayData.slope >= 0 ? '+' : '') + dayData.slope.toFixed(4);
-                document.getElementById('kpi-hr').textContent = dayData.band_mean_hr.toFixed(2);
-                document.getElementById('kpi-spread').textContent = dayData.band_mean_spread.toFixed(1) + "%";
-                document.getElementById('kpi-spread').className = dayData.band_mean_spread > 15 ? "text-xl sm:text-2xl font-mono font-black text-cyan-400 mt-1" : "text-xl sm:text-2xl font-mono font-black text-rose-500 mt-1";
-                document.getElementById('kpi-status').textContent = dayData.state;
+                this.updateKPIsAndAdvisory(dayData.state, dayData.band_mean_hr, dayData.slope, dayData.band_mean_spread);
+            },
+
+            updateKPIsAndAdvisory(stateText, hr, slope, spread) {
+                // Update KPI blocks
+                document.getElementById('kpi-hr').textContent = hr.toFixed(2);
+                document.getElementById('kpi-slope').textContent = (slope >= 0 ? '+' : '') + slope.toFixed(4);
+                document.getElementById('kpi-spread').textContent = spread.toFixed(1) + "%";
+                document.getElementById('kpi-spread').className = spread > 15 ? "text-2xl sm:text-3xl font-mono font-black text-cyan-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
+                
+                // Update Hero Advisory Panel
+                const advisoryEl = document.getElementById('kpi-status');
+                const accentEl = document.getElementById('status-accent');
+                
+                advisoryEl.textContent = stateText;
+                
+                // Dynamic styling based on the state emoji
+                if (stateText.includes("🟢")) {
+                    advisoryEl.className = "text-lg sm:text-xl font-bold text-emerald-400 ml-3 leading-relaxed transition-colors duration-500";
+                    accentEl.className = "absolute top-0 left-0 w-2 h-full bg-emerald-500 transition-colors duration-500";
+                } else if (stateText.includes("🟡")) {
+                    advisoryEl.className = "text-lg sm:text-xl font-bold text-amber-400 ml-3 leading-relaxed transition-colors duration-500";
+                    accentEl.className = "absolute top-0 left-0 w-2 h-full bg-amber-500 transition-colors duration-500";
+                } else if (stateText.includes("🟠")) {
+                    advisoryEl.className = "text-lg sm:text-xl font-bold text-orange-400 ml-3 leading-relaxed transition-colors duration-500";
+                    accentEl.className = "absolute top-0 left-0 w-2 h-full bg-orange-500 transition-colors duration-500";
+                } else if (stateText.includes("🔴")) {
+                    advisoryEl.className = "text-lg sm:text-xl font-bold text-rose-500 ml-3 leading-relaxed transition-colors duration-500";
+                    accentEl.className = "absolute top-0 left-0 w-2 h-full bg-rose-500 transition-colors duration-500";
+                } else {
+                    advisoryEl.className = "text-lg sm:text-xl font-bold text-stone-200 ml-3 leading-relaxed transition-colors duration-500";
+                    accentEl.className = "absolute top-0 left-0 w-2 h-full bg-stone-500 transition-colors duration-500";
+                }
             },
 
             useSimulation(mode) {
                 this.rawHistoryDocuments = [];
                 let hrData = [], tsData = [], pjmData = [], ercotData = [], spreadPct = 0;
+                let stateTxt = "";
+                
+                // Generate dummy dates (MM-DD) for the past 60 days
+                let dummyDates = [];
+                let d = new Date();
+                d.setDate(d.getDate() - 60);
+                for(let i=0; i<60; i++) {
+                    d.setDate(d.getDate() + 1);
+                    dummyDates.push(`${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+                }
 
                 if (mode === 'normal') {
                     for(let i=0; i<60; i++) { hrData.push(7.8 + Math.random()*0.1); tsData.push(0.06); }
                     pjmData = this.xMonths.map(x => 7.2 + (x-12)*0.06);
                     ercotData = this.xMonths.map(x => 5.8 + (x-12)*0.02);
                     spreadPct = 24.1;
-                    document.getElementById('kpi-status').textContent = "🟢 PJMに強烈なAIプレミアムが乗っている。バブル巡航中。利益を伸ばせ。";
+                    stateTxt = "🟢 【正常】AIプレミアム維持・順サヤ巡航。利益を伸ばせ。";
                 } else if (mode === 'noise') {
                     for(let i=0; i<59; i++) { hrData.push(7.7); tsData.push(0.06); } 
                     hrData.push(6.8); tsData.push(-0.01);
                     pjmData = this.xMonths.map(x => 6.8 + Math.random()*0.1);
                     ercotData = this.xMonths.map(x => 5.7 + Math.random()*0.1);
                     spreadPct = 19.2;
-                    document.getElementById('kpi-status').textContent = "🟡 一時的な歪みで水準が低下したが、スプレッド(19%)は維持。ノイズ判定につき無視。";
+                    stateTxt = "🟡 【偽陽性】絶対水準低下(全体ノイズ)。スプレッド維持につき無視せよ。";
                 } else if (mode === 'vacuum') {
                     for(let i=0; i<60; i++) { hrData.push(7.5 - (i/60)*0.2); tsData.push(0.06 - (i/60)*0.07); }
                     pjmData = this.xMonths.map(x => 7.0 - (x-12)*0.01);
                     ercotData = this.xMonths.map(x => 6.1 + (x-12)*0.01);
                     spreadPct = 14.7;
-                    document.getElementById('kpi-status').textContent = "🟠 AIプレミアム剥落開始。PJMとERCOTの差が縮小。ショートの配置準備を開始せよ。";
+                    stateTxt = "🟠 【真空状態】スプレッド縮小・カーブ水平化。ショートの配置準備を開始せよ。";
                 } else if (mode === 'collapse') {
                     for(let i=0; i<60; i++) { hrData.push(7.4 - (i/60)*1.8); tsData.push(0.02 - (i/60)*0.1); }
                     pjmData = this.xMonths.map(x => 6.2 - (x-12)*0.08);
                     ercotData = this.xMonths.map(x => 5.9 - (x-12)*0.02);
                     spreadPct = 5.1;
-                    document.getElementById('kpi-status').textContent = "🔴 PJMのAI特需が完全に死滅し、ERCOTと同化。フルショートを敢行せよ。";
+                    stateTxt = "🔴 【崩壊確定】AIプレミアム完全剥落・逆サヤ化。フルショートを敢行せよ。";
                 }
 
-                this.hrChart.data.datasets[0].data = hrData; this.hrChart.update();
-                this.slopeChart.data.datasets[0].data = tsData; this.slopeChart.update();
+                this.hrChart.data.labels = dummyDates;
+                this.hrChart.data.datasets[0].data = hrData; 
+                this.hrChart.data.datasets[1].data = Array(60).fill(7.0);
+                this.hrChart.update();
+
+                this.slopeChart.data.labels = dummyDates;
+                this.slopeChart.data.datasets[0].data = tsData; 
+                this.slopeChart.data.datasets[1].data = Array(60).fill(0);
+                this.slopeChart.update();
                 
                 this.csChart.data.datasets[0].data = pjmData;
                 this.csChart.data.datasets[1].data = ercotData;
-                const reg = this.calcLinearRegression(this.xMonths, pjmData);
-                this.csChart.data.datasets[2].data = [ { x: "12M", y: reg.slope * 12 + reg.intercept }, { x: "24M", y: reg.slope * 24 + reg.intercept } ];
                 this.csChart.update();
 
-                document.getElementById('kpi-slope').textContent = tsData[59].toFixed(4);
-                document.getElementById('kpi-hr').textContent = hrData[59].toFixed(2);
-                document.getElementById('kpi-spread').textContent = spreadPct.toFixed(1) + "%";
+                this.updateKPIsAndAdvisory(stateTxt, hrData[59], tsData[59], spreadPct);
             }
         };
 
