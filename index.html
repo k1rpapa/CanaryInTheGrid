@@ -149,7 +149,6 @@
             },
 
             bindChartInteractions() {
-                // スロープ推移チャートのクリックイベント（タイムトラベル）
                 document.getElementById('slopeChart').onclick = (evt) => {
                     const points = this.slopeChart.getElementsAtEventForMode(evt, 'index', { intersect: false }, true);
                     if (points.length > 0 && this.rawHistoryDocuments.length > 0) {
@@ -174,7 +173,8 @@
                 const btn = document.querySelector('button[onclick="app.loadLiveDatabase()"]');
                 btn.textContent = "同期中...";
                 
-                const restUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/canary_logs?orderBy=timestamp%20asc`;
+                // FIXED: Field key name mismatch resolved (timestamp -> timestamp_jst)
+                const restUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/canary_logs?orderBy=timestamp_jst%20asc`;
                 
                 try {
                     const res = await fetch(restUrl);
@@ -190,7 +190,8 @@
                             curveObj[k] = parseFloat(f.curve.mapValue.fields[k].doubleValue || f.curve.mapValue.fields[k].integerValue);
                         }
                         return {
-                            timestamp: f.timestamp.stringValue,
+                            // FIXED: Mapped properly from timestamp_jst
+                            timestamp: f.timestamp_jst.stringValue,
                             slope: parseFloat(f.slope.doubleValue || f.slope.integerValue),
                             band_mean_hr: parseFloat(f.band_mean_hr.doubleValue || f.band_mean_hr.integerValue),
                             band_mean_spread: parseFloat(f.band_mean_spread.doubleValue || f.band_mean_spread.integerValue),
@@ -249,7 +250,7 @@
             },
 
             useSimulation(mode) {
-                this.rawHistoryDocuments = []; // シミュレーション時はトラベル履歴をクリア
+                this.rawHistoryDocuments = [];
                 let hrData = [], tsData = [], pjmData = [], ercotData = [], spreadPct = 0;
 
                 if (mode === 'normal') {
@@ -291,7 +292,6 @@
                 document.getElementById('kpi-slope').textContent = tsData[59].toFixed(4);
                 document.getElementById('kpi-hr').textContent = hrData[59].toFixed(2);
                 document.getElementById('kpi-spread').textContent = spreadPct.toFixed(1) + "%";
-                document.getElementById('kpi-spread').className = spreadPct > 15.0 ? "text-xl sm:text-2xl font-mono font-black text-cyan-400 mt-1" : "text-xl sm:text-2xl font-mono font-black text-rose-500 mt-1";
             }
         };
 
