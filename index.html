@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CanaryTerminal v3.9 Dual-Slope UI</title>
+    <title>CanaryTerminal v3.9.1 Tactical Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -18,8 +18,8 @@
     <nav class="bg-stone-950 border-b border-stone-800 text-stone-100 sticky top-0 z-50 shadow-md">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between h-auto sm:h-16 items-center py-3 sm:py-0">
             <div class="flex items-center mb-3 sm:mb-0">
-                <span class="text-sm font-black tracking-widest text-stone-100">🐦 CANARY TERMINAL v3.9</span>
-                <span class="text-[9px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded-full ml-3 font-mono">DUAL-SLOPE UI</span>
+                <span class="text-sm font-black tracking-widest text-stone-100">🐦 CANARY TERMINAL v3.9.1</span>
+                <span class="text-[9px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded-full ml-3 font-mono">TACTICAL UI</span>
             </div>
             <div class="flex items-center space-x-2">
                 <input type="text" id="gcp-project-id" placeholder="GCPプロジェクトID" class="bg-stone-900 border border-stone-800 text-xs text-stone-200 px-3 py-1.5 rounded-lg font-mono">
@@ -32,9 +32,9 @@
         
         <!-- Tactical Advisory (Hero Section) -->
         <div class="bg-stone-900/80 border-2 border-stone-700 p-5 rounded-2xl mb-6 shadow-2xl relative overflow-hidden">
-            <div id="status-accent" class="absolute top-0 left-0 w-2 h-full bg-stone-500"></div>
+            <div id="status-accent" class="absolute top-0 left-0 w-2 h-full bg-stone-500 transition-colors duration-500"></div>
             <span class="text-[10px] font-black text-stone-500 uppercase tracking-widest block mb-1 ml-3">TACTICAL ADVISORY (サマリー)</span>
-            <div id="kpi-status" class="text-lg sm:text-xl font-bold text-stone-200 ml-3 leading-relaxed">データをロードしてください。</div>
+            <div id="kpi-status" class="text-lg sm:text-xl font-bold text-stone-200 ml-3 leading-relaxed transition-colors duration-500">データをロードしてください。</div>
         </div>
 
         <!-- Simulation Controller -->
@@ -47,7 +47,7 @@
 
         <!-- Visual Radar (3 Main Charts) -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            <!-- Chart ①: Band Mean HR Time-Series (Dual Lines) -->
+            <!-- Chart ①: Band Mean HR Time-Series -->
             <div class="glass-panel p-4 rounded-2xl flex flex-col">
                 <div class="mb-3">
                     <span class="text-[9px] font-black text-stone-500 uppercase tracking-widest block">ABSOLUTE LEVEL TRACKER</span>
@@ -56,11 +56,11 @@
                 <div class="chart-container flex-grow"><canvas id="hrChart"></canvas></div>
             </div>
 
-            <!-- Chart ②: Curve Slope Time-Series (Dual Lines) -->
+            <!-- Chart ②: Curve Slope Time-Series -->
             <div class="glass-panel p-4 rounded-2xl flex flex-col">
                 <div class="mb-3">
                     <span class="text-[9px] font-black text-stone-500 uppercase tracking-widest block">MACRO DECAY TRACKER</span>
-                    <h3 class="text-xs font-bold text-stone-200">② カーボスロープ推移（期近 vs 遠月傾きm）</h3>
+                    <h3 class="text-xs font-bold text-stone-200">② カーボスロープ推移 (期近 vs 遠月傾きm)</h3>
                 </div>
                 <div class="chart-container flex-grow"><canvas id="slopeChart"></canvas></div>
             </div>
@@ -75,25 +75,22 @@
             </div>
         </div>
 
-        <!-- Tactical KPI Board -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="kpi-board">
-            <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl shadow-inner">
-                <span class="text-[10px] text-stone-500 font-bold block tracking-wider">NEAR PJM HR (0-11M)</span>
-                <div id="kpi-near-hr" class="text-xl sm:text-2xl font-mono font-black text-stone-400 mt-1">---</div>
-            </div>
-            <div class="bg-stone-950 border border-stone-700 p-4 rounded-xl shadow-inner border-l-4 border-l-cyan-500">
+        <!-- Tactical KPI Board (Unified 3x3 Layout) -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4" id="kpi-board">
+            <div class="bg-stone-950 border border-stone-700 p-4 rounded-xl shadow-inner border-l-4 border-l-cyan-500 flex flex-col justify-between">
                 <span class="text-[10px] text-cyan-400 font-bold block tracking-wider">FAR PJM HR (12-24M)</span>
-                <div id="kpi-hr" class="text-xl sm:text-2xl font-mono font-black text-stone-100 mt-1">---</div>
+                <div id="kpi-hr" class="text-2xl sm:text-3xl font-mono font-black text-stone-100 mt-1">---</div>
+                <div class="text-[10px] text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Near(0-11M): <span id="kpi-near-hr" class="text-stone-400">---</span></div>
             </div>
-            <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl shadow-inner border-l-4 border-l-amber-500">
+            <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl shadow-inner border-l-4 border-l-amber-500 flex flex-col justify-between">
                 <span class="text-[10px] text-amber-500 font-bold block tracking-wider">FAR SLOPE (m)</span>
-                <div id="kpi-slope" class="text-xl sm:text-2xl font-mono font-black text-amber-400 mt-1">---</div>
-                <!-- ADDED: Near slope display inside the far slope box for comparison -->
-                <div class="text-[10px] text-stone-500 font-mono mt-1">Near: <span id="kpi-near-slope">---</span></div>
+                <div id="kpi-slope" class="text-2xl sm:text-3xl font-mono font-black text-amber-400 mt-1">---</div>
+                <div class="text-[10px] text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Near(0-11M): <span id="kpi-near-slope" class="text-stone-400">---</span></div>
             </div>
-            <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl relative overflow-hidden shadow-inner border-l-4 border-l-cyan-500">
+            <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl relative overflow-hidden shadow-inner border-l-4 border-l-cyan-500 flex flex-col justify-between">
                 <span class="text-[10px] text-stone-500 font-bold block tracking-wider">FAR PREMIUM SPREAD</span>
-                <div id="kpi-spread" class="text-xl sm:text-2xl font-mono font-black text-cyan-400 mt-1">---</div>
+                <div id="kpi-spread" class="text-2xl sm:text-3xl font-mono font-black text-cyan-400 mt-1">---</div>
+                <div class="text-[10px] text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Threshold: <span class="text-stone-400">15.0%</span></div>
             </div>
         </div>
     </main>
@@ -131,7 +128,7 @@
                     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#a8a29e', font: { size: 9 } } } }, scales: { x: commonXAxisOptions, y: { min: 5.5, max: 9.0, ticks: { color: '#a8a29e', font: { size: 10 } } } } }
                 });
 
-                // Chart ②: Dual Line Slope (Near vs Far Slope) - NEW
+                // Chart ②: Dual Line Slope (Near vs Far Slope)
                 this.slopeChart = new Chart(document.getElementById('slopeChart').getContext('2d'), {
                     type: 'line',
                     data: {
@@ -167,7 +164,7 @@
                     }
                 };
             },
-            
+
             calcLinearRegression(xArr, yArr) {
                 const n = xArr.length;
                 let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
@@ -200,13 +197,9 @@
                         }
                         let rawDate = f.timestamp_jst ? f.timestamp_jst.stringValue : (f.timestamp ? f.timestamp.stringValue : "");
                         
-                        // NEW: Calculate near_slope dynamically on the frontend based on curve data
-                        // Since near_slope is not currently saved in the backend
+                        // 動的に期近の傾き(Near Slope)を計算
                         let near_slope = 0;
-                        let near_x = [];
-                        let near_y = [];
-                        
-                        // Try to calculate from curve if available (0M to 11M)
+                        let near_x = [], near_y = [];
                         if (Object.keys(curveObj).length > 0) {
                             for(let i=0; i<=11; i++) {
                                 if(curveObj[`pjm_hr_${i}m`] !== undefined) {
@@ -224,7 +217,7 @@
                             timestamp_raw: rawDate,
                             date_short: rawDate ? rawDate.substring(5, 10) : "N/A",
                             slope: f.slope ? parseFloat(f.slope.doubleValue || f.slope.integerValue) : 0,
-                            near_slope: near_slope, // Calculated locally
+                            near_slope: near_slope,
                             band_mean_hr: f.band_mean_hr ? parseFloat(f.band_mean_hr.doubleValue || f.band_mean_hr.integerValue) : 0,
                             band_mean_near_hr: f.band_mean_near_hr ? parseFloat(f.band_mean_near_hr.doubleValue || f.band_mean_near_hr.integerValue) : 7.0,
                             band_mean_spread: f.band_mean_spread ? parseFloat(f.band_mean_spread.doubleValue || f.band_mean_spread.integerValue) : 0,
@@ -250,7 +243,7 @@
 
                 this.slopeChart.data.labels = labels;
                 this.slopeChart.data.datasets[0].data = displayData.map(d => d.slope);
-                this.slopeChart.data.datasets[1].data = displayData.map(d => d.near_slope); // Near slope
+                this.slopeChart.data.datasets[1].data = displayData.map(d => d.near_slope);
                 this.slopeChart.data.datasets[2].data = Array(displayData.length).fill(0);
                 this.slopeChart.update();
                 
@@ -274,15 +267,15 @@
                 document.getElementById('kpi-slope').textContent = (dayData.slope >= 0 ? '+' : '') + dayData.slope.toFixed(4);
                 document.getElementById('kpi-near-slope').textContent = (dayData.near_slope >= 0 ? '+' : '') + dayData.near_slope.toFixed(4);
                 document.getElementById('kpi-spread').textContent = dayData.band_mean_spread.toFixed(1) + "%";
-                document.getElementById('kpi-spread').className = dayData.band_mean_spread > 15 ? "text-xl sm:text-2xl font-mono font-black text-cyan-400 mt-1" : "text-xl sm:text-2xl font-mono font-black text-rose-500 mt-1";
+                document.getElementById('kpi-spread').className = dayData.band_mean_spread > 15 ? "text-2xl sm:text-3xl font-mono font-black text-cyan-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
                 
                 const adv = document.getElementById('kpi-status');
                 const acc = document.getElementById('status-accent');
                 adv.textContent = dayData.state;
-                if (dayData.state.includes("🟢")) { adv.className = "text-lg font-bold text-emerald-400 ml-3"; acc.className = "absolute top-0 left-0 w-2 h-full bg-emerald-500"; }
-                else if (dayData.state.includes("🟡")) { adv.className = "text-lg font-bold text-amber-400 ml-3"; acc.className = "absolute top-0 left-0 w-2 h-full bg-amber-500"; }
-                else if (dayData.state.includes("🟠")) { adv.className = "text-lg font-bold text-orange-400 ml-3"; acc.className = "absolute top-0 left-0 w-2 h-full bg-orange-500"; }
-                else if (dayData.state.includes("🔴")) { adv.className = "text-lg font-bold text-rose-500 ml-3"; acc.className = "absolute top-0 left-0 w-2 h-full bg-rose-500"; }
+                if (dayData.state.includes("🟢")) { adv.className = "text-lg sm:text-xl font-bold text-emerald-400 ml-3 leading-relaxed transition-colors duration-500"; acc.className = "absolute top-0 left-0 w-2 h-full bg-emerald-500 transition-colors duration-500"; }
+                else if (dayData.state.includes("🟡")) { adv.className = "text-lg sm:text-xl font-bold text-amber-400 ml-3 leading-relaxed transition-colors duration-500"; acc.className = "absolute top-0 left-0 w-2 h-full bg-amber-500 transition-colors duration-500"; }
+                else if (dayData.state.includes("🟠")) { adv.className = "text-lg sm:text-xl font-bold text-orange-400 ml-3 leading-relaxed transition-colors duration-500"; acc.className = "absolute top-0 left-0 w-2 h-full bg-orange-500 transition-colors duration-500"; }
+                else if (dayData.state.includes("🔴")) { adv.className = "text-lg sm:text-xl font-bold text-rose-500 ml-3 leading-relaxed transition-colors duration-500"; acc.className = "absolute top-0 left-0 w-2 h-full bg-rose-500 transition-colors duration-500"; }
             },
 
             useSimulation(mode) {
@@ -296,6 +289,16 @@
                     pjmY = this.xMonths.map(x => x >= 12 ? 7.4 + (x-12)*0.05 : 6.8 + x*0.02);
                     ercotY = this.xMonths.map(x => x >= 12 ? 6.1 + (x-12)*0.02 : 5.8 + x*0.01);
                     spread = 25.0; state = "🟢 【正常】AIプレミアム維持・順サヤ巡航。未来の割高感が綺麗に描画中。";
+                } else if (mode === 'noise') {
+                    for(let i=0; i<60; i++) { hrFar.push(7.7); hrNear.push(7.0); ts.push(0.05); tsNear.push(0.02); }
+                    pjmY = this.xMonths.map(x => x >= 12 ? 7.2 + (x-12)*0.05 : 6.6 + x*0.02);
+                    ercotY = this.xMonths.map(x => x >= 12 ? 5.9 + (x-12)*0.02 : 5.6 + x*0.01);
+                    spread = 19.2; state = "🟡 【偽陽性】絶対水準低下(全体ノイズ)。スプレッド維持につき無視せよ。";
+                } else if (mode === 'vacuum') {
+                    for(let i=0; i<60; i++) { hrFar.push(7.5); hrNear.push(7.2); ts.push(0.01); tsNear.push(0.03); }
+                    pjmY = this.xMonths.map(x => x >= 12 ? 7.0 + (x-12)*0.01 : 6.5 + x*0.03);
+                    ercotY = this.xMonths.map(x => x >= 12 ? 6.1 + (x-12)*0.01 : 5.7 + x*0.01);
+                    spread = 14.7; state = "🟠 【真空状態】スプレッド縮小・カーブ水平化。ショートの配置準備を開始せよ。";
                 } else if (mode === 'collapse') {
                     for(let i=0; i<60; i++) { hrFar.push(6.2); hrNear.push(6.8); ts.push(-0.08); tsNear.push(-0.02); }
                     pjmY = this.xMonths.map(x => x >= 12 ? 6.4 - (x-12)*0.08 : 7.0 - x*0.02);
@@ -312,7 +315,15 @@
                 document.getElementById('kpi-slope').textContent = (ts[59] >= 0 ? '+' : '') + ts[59].toFixed(4);
                 document.getElementById('kpi-near-slope').textContent = (tsNear[59] >= 0 ? '+' : '') + tsNear[59].toFixed(4);
                 document.getElementById('kpi-spread').textContent = spread.toFixed(1) + "%";
-                document.getElementById('kpi-status').textContent = state;
+                document.getElementById('kpi-spread').className = spread > 15 ? "text-2xl sm:text-3xl font-mono font-black text-cyan-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
+                
+                const adv = document.getElementById('kpi-status');
+                const acc = document.getElementById('status-accent');
+                adv.textContent = state;
+                if (state.includes("🟢")) { adv.className = "text-lg sm:text-xl font-bold text-emerald-400 ml-3 leading-relaxed transition-colors duration-500"; acc.className = "absolute top-0 left-0 w-2 h-full bg-emerald-500 transition-colors duration-500"; }
+                else if (state.includes("🟡")) { adv.className = "text-lg sm:text-xl font-bold text-amber-400 ml-3 leading-relaxed transition-colors duration-500"; acc.className = "absolute top-0 left-0 w-2 h-full bg-amber-500 transition-colors duration-500"; }
+                else if (state.includes("🟠")) { adv.className = "text-lg sm:text-xl font-bold text-orange-400 ml-3 leading-relaxed transition-colors duration-500"; acc.className = "absolute top-0 left-0 w-2 h-full bg-orange-500 transition-colors duration-500"; }
+                else if (state.includes("🔴")) { adv.className = "text-lg sm:text-xl font-bold text-rose-500 ml-3 leading-relaxed transition-colors duration-500"; acc.className = "absolute top-0 left-0 w-2 h-full bg-rose-500 transition-colors duration-500"; }
             }
         };
         document.addEventListener('DOMContentLoaded', () => app.init());
