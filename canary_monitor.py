@@ -4,12 +4,13 @@ import time
 import requests
 import gspread
 import statistics
+import sys # sysモジュールを追加 (強制終了用)
 from google.oauth2.service_account import Credentials
 from google.cloud import firestore
 from datetime import datetime, timezone, timedelta
 
 # =========================================================================
-# CanaryInTheGrid v5.1 - Phase 4: Execution Layer (LINE Messaging API)
+# CanaryInTheGrid v5.2 - Phase 4: Alert Debug Mode (Hard Fail)
 # =========================================================================
 
 ALL_MONTHS = list(range(0, 25))
@@ -176,15 +177,15 @@ def calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, 
     }
 
 # =========================================================================
-# 🚨 Phase 4: Tactical Alert Module (Discord & LINE Messaging API)
+# 🚨 Phase 4: Tactical Alert Module (Debug Mode)
 # =========================================================================
 def dispatch_alert(metrics, discord_url, line_channel_token, line_user_id):
     state = metrics['state']
     
-    # 🔴崩壊 と 🟠真空 の場合のみアラート発動
-    #if "🔴" not in state and "🟠" not in state:
-        #print("[*] Market Stable. No tactical alert dispatched.")
-        #return
+    # 🔴崩壊 と 🟠真空 の場合のみアラート発動 (テスト時はこれをコメントアウト)
+    # if "🔴" not in state and "🟠" not in state:
+    #     print("[*] Market Stable. No tactical alert dispatched.")
+    #     return
 
     print("🚨 [CRITICAL] TRIGGERING TACTICAL ALERT! 🚨")
     
@@ -200,35 +201,39 @@ def dispatch_alert(metrics, discord_url, line_channel_token, line_user_id):
 * **CFTC Whale Long:** {metrics['cftc_whale_long']} ({metrics['cftc_date']})
 """
 
-    # 1. Dispatch to Discord
     if discord_url:
         try:
             res = requests.post(discord_url, json={"content": message})
             if res.status_code in [200, 204]: print("[+] Discord Alert Sent.")
-        except Exception as e: print(f"[-] Discord Alert Failed: {e}")
+            else: print(f"[-] Discord Failed: {res.status_code} - {res.text}")
+        except Exception as e: print(f"[-] Discord Alert Exception: {e}")
 
-    # 2. Dispatch to LINE Messaging API
     if line_channel_token and line_user_id:
+        print("[*] Attempting to send LINE Alert...")
         try:
             headers = {
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {line_channel_token}"
+                "Authorization": f"Bearer {line_channel_token.strip()}" # 空白除去の保険
             }
             data = {
-                "to": line_user_id,
-                "messages": [
-                    {
-                        "type": "text",
-                        "text": message
-                    }
-                ]
+                "to": line_user_id.strip(), # 空白除去の保険
+                "messages": [{"type": "text", "text": message}]
             }
             res = requests.post("https://api.line.me/v2/bot/message/push", headers=headers, json=data)
+            
             if res.status_code == 200: 
-                print("[+] LINE Messaging API Alert Sent.")
+                print("[+] LINE Messaging API Alert Sent Successfully.")
             else:
-                print(f"[-] LINE Alert Failed: {res.status_code} - {res.text}")
-        except Exception as e: print(f"[-] LINE Alert Exception: {e}")
+                # HTTPステータスが200以外なら、詳細をログに出して強制クラッシュさせる
+                error_msg = f"[-] LINE Alert Failed! Status: {res.status_code}, Response: {res.text}"
+                print(error_msg)
+                sys.exit(error_msg) # ここでスクリプトを止める
+                
+        except Exception as e: 
+            print(f"[-] LINE Alert Exception: {e}")
+            sys.exit(str(e))
+    else:
+        print("[-] LINE credentials not found. Skipping LINE alert.")
 
 # =========================================================================
 
@@ -262,23 +267,21 @@ if __name__ == "__main__":
     GCP_SERVICE_ACCOUNT_JSON = os.getenv("GCP_SERVICE_ACCOUNT_JSON")
     DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL") 
     
-    # Phase 4: LINE Messaging API variables
     LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
     LINE_USER_ID = os.getenv("LINE_USER_ID")
     
     if not GCP_SHEET_ID or not GCP_SERVICE_ACCOUNT_JSON:
         print("[-] Fatal: Missing GCP environment variables.")
-        exit(1)
+        sys.exit(1)
 
     cftc_whale_long, cftc_date = fetch_cftc_macro_proxy()
     gas_curve, pjm_curve, ercot_curve = fetch_market_data_with_fallback()
     
     metrics = calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, cftc_date)
     
-    # Execution Layer: Alert Check
+    # 💥 テスト発射（エラーがあればここで Actions が赤くなる）
     dispatch_alert(metrics, DISCORD_WEBHOOK_URL, LINE_CHANNEL_ACCESS_TOKEN, LINE_USER_ID)
     
-    # Data Layer: Logging
     log_to_google_sheets(metrics, GCP_SERVICE_ACCOUNT_JSON, GCP_SHEET_ID)
     log_to_cloud_firestore(metrics, GCP_SERVICE_ACCOUNT_JSON)
     
