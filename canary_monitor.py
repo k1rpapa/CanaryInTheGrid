@@ -9,7 +9,7 @@ from google.cloud import firestore
 from datetime import datetime, timezone, timedelta
 
 # =========================================================================
-# CanaryInTheGrid v4.0 - Liquid Gravity Engine (Phase 2)
+# CanaryInTheGrid v4.5 - Phase 3: CFTC Whale Ledger (Root B)
 # =========================================================================
 
 ALL_MONTHS = list(range(0, 25))
@@ -30,14 +30,50 @@ def fetch_with_backoff(url, headers=None, max_retries=5):
             delay *= 2
 
 def safe_int(value):
-    """CMEのカンマ区切り文字列(例:'1,250')を安全に数値へ変換"""
     if not value or value == '-': return 0
     if isinstance(value, str):
         return int(value.replace(',', '').split('.')[0])
     return int(value)
 
+def fetch_cftc_power_index():
+    """CFTC API(Socrata)から電力市場の実需筋＆スワップディーラーの買いを合算抽出"""
+    print("[*] Infiltrating CFTC Socrata API for Power Market Ledgers...")
+    # CFTC Disaggregated Futures Only Report Endpoint
+    url = "https://publicreporting.cftc.gov/resource/72hh-3qng.json"
+    
+    # PJM, ERCOT等の代表的なCFTCコントラクトコード（複数市場の合算インデックス用）
+    power_codes = ["064651", "064655", "064A57"] 
+    
+    whale_long_total = 0
+    report_date = "N/A"
+    
+    try:
+        for code in power_codes:
+            # 最新のレポートを1件だけ取得
+            query = f"{url}?cftc_contract_market_code={code}&$order=report_date_as_yyyy_mm_dd DESC&$limit=1"
+            response = requests.get(query, timeout=10)
+            
+            if response.status_code == 200 and len(response.json()) > 0:
+                data = response.json()[0]
+                report_date = data.get("report_date_as_yyyy_mm_dd", report_date)[:10]
+                
+                # 実需(Producer/Merchant)とSwap Dealersの買いポジション(ロング)を合算
+                pm_long = float(data.get("prod_merc_positions_long", 0))
+                sd_long = float(data.get("swap_positions_long", 0))
+                whale_long_total += (pm_long + sd_long)
+                
+        if whale_long_total == 0:
+            raise Exception("No significant positions found.")
+            
+        print(f"[+] CFTC Whales Identified (Date: {report_date}): {whale_long_total} contracts")
+        return whale_long_total, report_date
+        
+    except Exception as e:
+        print(f"[!] CFTC Fetch Warning: {e}. Engaging simulated ledger.")
+        # API障害やデータ欠損時のタクティカル・フォールバック
+        return 12500, "Simulated"
+
 def fetch_cme_curve(product_id, default_start_price, default_step):
-    """CMEから価格だけでなくVolumeとOI(建玉)も強制抽出するスナイパー"""
     print(f"[*] Extracting Price, Volume & OI from Product ID: {product_id}...")
     cme_url = f"https://www.cmegroup.com/CmeWS/mvc/Quotes/Future/{product_id}/G"
     headers = {
@@ -50,19 +86,15 @@ def fetch_cme_curve(product_id, default_start_price, default_step):
     try:
         response = fetch_with_backoff(cme_url, headers=headers)
         data = response.json()
-        
         if len(data) < 25: raise Exception(f"Insufficient liquidity ({len(data)} months).")
             
         for idx, m in enumerate(ALL_MONTHS):
             month_data = data[idx]
             price = float(month_data.get('last', 0)) or float(month_data.get('priorSettle', 0))
-            volume = safe_int(month_data.get('volume', 0))
-            oi = safe_int(month_data.get('openInterest', 0))
-            
             curve[m] = {
                 'price': price if price > 0.5 else (default_start_price + idx * default_step),
-                'volume': volume,
-                'oi': oi
+                'volume': safe_int(month_data.get('volume', 0)),
+                'oi': safe_int(month_data.get('openInterest', 0))
             }
         return curve
     except Exception as e:
@@ -70,14 +102,10 @@ def fetch_cme_curve(product_id, default_start_price, default_step):
         return None
 
 def generate_regional_power_curves(gas_curve):
-    """流動性枯渇時のフォールバック（OI/Volumeのダミー生成含む）"""
     pjm_curve, ercot_curve = {}, {}
     for m in ALL_MONTHS:
-        # 価格モデリング
         pjm_base_hr = 7.6 + ((m - 12) * 0.05) if m >= 12 else 7.3 + (m * 0.02)
         ercot_base_hr = 6.2 + ((m - 12) * 0.02) if m >= 12 else 6.0 + (m * 0.01)
-        
-        # 枯渇時を想定した低いOIダミー
         dummy_oi = max(0, 500 - (m * 15)) 
         
         pjm_curve[m] = {'price': round(gas_curve[m]['price'] * pjm_base_hr, 2), 'volume': 0, 'oi': dummy_oi}
@@ -98,14 +126,11 @@ def fetch_market_data_with_fallback():
         
     return gas_curve, pjm_curve, ercot_curve
 
-def calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve):
-    """価格空間(Phase1)と流動性重力(Phase2)の統合判定"""
-    print("[*] Calculating Phase 1 & Phase 2 Metrics...")
+def calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, cftc_date):
+    print("[*] Calculating Phase 1-3 Unified Metrics...")
     
     pjm_all_hrs, ercot_all_hrs, spreads = [], [], []
     curve_data_map = {}
-    
-    # Phase 2: 流動性集計用変数
     pjm_far_oi_total = 0
     pjm_far_vol_total = 0
     
@@ -126,12 +151,10 @@ def calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve):
         spread_pct = ((hr_pjm - hr_ercot) / hr_ercot) * 100 if hr_ercot > 0 else 0
         spreads.append(spread_pct)
         
-        # 遠月(12-24M)のOIとVolumeを合算（PJM市場のクジラの生息確認）
         if m in FAR_MONTHS:
             pjm_far_oi_total += pjm_curve[m]['oi']
             pjm_far_vol_total += pjm_curve[m]['volume']
         
-        # UI用に価格、OI、Volumeをすべて保存
         curve_data_map[f"pjm_hr_{m}m"] = round(hr_pjm, 4)
         curve_data_map[f"ercot_hr_{m}m"] = round(hr_ercot, 4)
         curve_data_map[f"pjm_oi_{m}m"] = pjm_curve[m]['oi']
@@ -145,22 +168,20 @@ def calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve):
     band_mean_far_spread = statistics.mean(spreads_far)
     slope, _ = statistics.linear_regression(FAR_MONTHS, pjm_far_hrs)
     
-    # =====================================================
-    # 🚨 Phase 2 判定ゲート (流動性枯渇 + 逆サヤ)
-    # OI合計が極端に少ない(例:100未満)場合は、価格が見せかけと判断
-    # =====================================================
-    LIQUIDITY_WARNING = pjm_far_oi_total < 500  # 仮のしきい値(実稼働で調整)
+    LIQUIDITY_WARNING = pjm_far_oi_total < 500
+    # Phase 3: CFTCの実需クジラが逃げているかどうかの判定を追加
+    WHALE_WARNING = cftc_whale_long < 5000 
     
-    if band_mean_far_hr < 7.0 and slope < 0 and LIQUIDITY_WARNING:
-        state = "🔴 【崩壊確定】OI消失・逆サヤ化。バブル完全崩壊"
+    if band_mean_far_hr < 7.0 and slope < 0 and LIQUIDITY_WARNING and WHALE_WARNING:
+        state = "🔴 【崩壊確定】OI消失・実需逃避。バブル完全崩壊"
     elif slope < 0 or (band_mean_far_spread < 15.0 and LIQUIDITY_WARNING):
         state = "🟠 【真空状態】流動性枯渇・スプレッド急縮小"
     elif band_mean_far_hr < 7.0:
         state = "🟡 【偽陽性】水準低下するもOI維持(ノイズ)"
-    elif LIQUIDITY_WARNING:
-        state = "🟡 【流動性低下】価格維持するも建玉減少(警戒)"
+    elif LIQUIDITY_WARNING or WHALE_WARNING:
+        state = "🟡 【流動性低下】価格維持するも実需建玉減少(警戒)"
     else:
-        state = "🟢 【正常】AIプレミアム＆OI(建玉) 堅調維持"
+        state = "🟢 【正常】AIプレミアム＆実需OI(建玉) 堅調維持"
 
     return {
         "timestamp_jst": (datetime.now(timezone.utc) + timedelta(hours=9)).strftime('%Y-%m-%d %H:%M:%S'),
@@ -168,8 +189,10 @@ def calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve):
         "band_mean_hr": round(band_mean_far_hr, 4),
         "band_mean_near_hr": round(band_mean_near_hr, 4),
         "band_mean_spread": round(band_mean_far_spread, 2),
-        "far_oi_total": pjm_far_oi_total,   # NEW: 遠月の建玉総量
-        "far_vol_total": pjm_far_vol_total, # NEW: 遠月の出来高総量
+        "far_oi_total": pjm_far_oi_total,
+        "far_vol_total": pjm_far_vol_total,
+        "cftc_whale_long": cftc_whale_long, # Phase 3: 実需のロング総量
+        "cftc_date": cftc_date,             # Phase 3: レポート日付
         "state": state,
         "curve_data": curve_data_map
     }
@@ -183,11 +206,11 @@ def log_to_google_sheets(metrics, credentials_json_str, sheet_id):
         gc = gspread.authorize(credentials)
         worksheet = gc.open_by_key(sheet_id).sheet1
         
-        # OIとVolumeをシートの列に追加
         row_data = [
             metrics["timestamp_jst"], metrics["band_mean_hr"], metrics["slope"],
             metrics["band_mean_spread"], metrics["band_mean_near_hr"], 
-            metrics["far_oi_total"], metrics["far_vol_total"], metrics["state"]
+            metrics["far_oi_total"], metrics["far_vol_total"], 
+            metrics["cftc_whale_long"], metrics["state"]
         ]
         worksheet.append_row(row_data)
         print("[+] Google Sheets sync complete.")
@@ -213,8 +236,14 @@ if __name__ == "__main__":
         print("[-] Fatal: Missing environment variables.")
         exit(1)
 
+    # Phase 3: CFTCデータ取得
+    cftc_whale_long, cftc_date = fetch_cftc_power_index()
+
+    # Phase 1&2: CMEデータ取得
     gas_curve, pjm_curve, ercot_curve = fetch_market_data_with_fallback()
-    metrics = calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve)
+    
+    # 統合演算
+    metrics = calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, cftc_date)
     
     log_to_google_sheets(metrics, GCP_SERVICE_ACCOUNT_JSON, GCP_SHEET_ID)
     log_to_cloud_firestore(metrics, GCP_SERVICE_ACCOUNT_JSON)
