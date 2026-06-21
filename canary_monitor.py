@@ -9,7 +9,7 @@ from google.cloud import firestore
 from datetime import datetime, timezone, timedelta
 
 # =========================================================================
-# CanaryInTheGrid v4.6 - Phase 3: CFTC Macro Proxy (Root A - Henry Hub)
+# CanaryInTheGrid v4.6.1 - Phase 3: CFTC Macro Proxy (Endpoint Fix)
 # =========================================================================
 
 ALL_MONTHS = list(range(0, 25))
@@ -38,8 +38,9 @@ def safe_int(value):
 def fetch_cftc_macro_proxy():
     """CFTC APIからマクロ・プロキシ（ヘンリーハブ天然ガス）の実需＆SDロングを取得"""
     print("[*] Infiltrating CFTC Socrata API for Macro Proxy (Henry Hub)...")
-    # CFTC Disaggregated Futures Only Report Endpoint
-    url = "https://publicreporting.cftc.gov/resource/72hh-3qng.json"
+    
+    # 修正: CFTC Disaggregated Futures Only Reportの正しいエンドポイントID (72hh-3qpy)
+    url = "https://publicreporting.cftc.gov/resource/72hh-3qpy.json"
     
     # Henry Hub Natural Gas (NYMEX) のCFTCコントラクトコード
     macro_proxy_code = "023651" 
@@ -61,7 +62,7 @@ def fetch_cftc_macro_proxy():
             print(f"[+] CFTC Macro Proxy Identified (Date: {report_date}): {whale_long_total} contracts")
             return whale_long_total, report_date
         else:
-            raise Exception("API returned empty data.")
+            raise Exception(f"API returned empty data or status code {response.status_code}.")
             
     except Exception as e:
         print(f"[!] CFTC Fetch Error: {e}. Engaging simulated ledger.")
@@ -163,7 +164,6 @@ def calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, 
     slope, _ = statistics.linear_regression(FAR_MONTHS, pjm_far_hrs)
     
     LIQUIDITY_WARNING = pjm_far_oi_total < 500
-    # ヘンリーハブ(プロキシ)の閾値は非常に大きいため調整が必要(仮で100,000とする)
     WHALE_WARNING = cftc_whale_long < 100000 
     
     if band_mean_far_hr < 7.0 and slope < 0 and LIQUIDITY_WARNING and WHALE_WARNING:
@@ -230,13 +230,9 @@ if __name__ == "__main__":
         print("[-] Fatal: Missing environment variables.")
         exit(1)
 
-    # Phase 3: CFTCマクロプロキシデータ取得
     cftc_whale_long, cftc_date = fetch_cftc_macro_proxy()
-
-    # Phase 1&2: CMEデータ取得
     gas_curve, pjm_curve, ercot_curve = fetch_market_data_with_fallback()
     
-    # 統合演算
     metrics = calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, cftc_date)
     
     log_to_google_sheets(metrics, GCP_SERVICE_ACCOUNT_JSON, GCP_SHEET_ID)
