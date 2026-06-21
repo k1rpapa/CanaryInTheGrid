@@ -182,9 +182,9 @@ def dispatch_alert(metrics, discord_url, line_channel_token, line_user_id):
     state = metrics['state']
     
     # 🔴崩壊 と 🟠真空 の場合のみアラート発動
-    if "🔴" not in state and "🟠" not in state:
-        print("[*] Market Stable. No tactical alert dispatched.")
-        return
+    #if "🔴" not in state and "🟠" not in state:
+        #print("[*] Market Stable. No tactical alert dispatched.")
+        #return
 
     print("🚨 [CRITICAL] TRIGGERING TACTICAL ALERT! 🚨")
     
