@@ -3,23 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CanaryTerminal v4.0.1 Liquid Gravity UI (Volume Fix)</title>
+    <title>CanaryTerminal v4.5 Whale Ledger UI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'SF Pro Display', Arial, sans-serif; background-color: #0c0a09; color: #f5f5f4; }
-        .chart-container { position: relative; width: 100%; height: 32vh; min-height: 250px; }
+        .chart-container { position: relative; width: 100%; height: 30vh; min-height: 220px; }
         .glass-panel { background-color: rgba(28, 25, 23, 0.8); border: 1px solid rgba(120, 113, 108, 0.3); backdrop-filter: blur(10px); }
     </style>
 </head>
 <body class="min-h-screen flex flex-col antialiased">
 
-    <!-- Global Navigation -->
     <nav class="bg-stone-950 border-b border-stone-800 text-stone-100 sticky top-0 z-50 shadow-md">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between h-auto sm:h-16 items-center py-3 sm:py-0">
             <div class="flex items-center mb-3 sm:mb-0">
-                <span class="text-sm font-black tracking-widest text-stone-100">🐦 CANARY TERMINAL v4.0.1</span>
-                <span class="text-[9px] bg-purple-500/20 text-purple-400 border border-purple-500/30 px-2 py-0.5 rounded-full ml-3 font-mono">LIQUID GRAVITY UI</span>
+                <span class="text-sm font-black tracking-widest text-stone-100">🐦 CANARY TERMINAL v4.5</span>
+                <span class="text-[9px] bg-fuchsia-500/20 text-fuchsia-400 border border-fuchsia-500/30 px-2 py-0.5 rounded-full ml-3 font-mono">WHALE LEDGER UI</span>
             </div>
             <div class="flex items-center space-x-2">
                 <input type="text" id="gcp-project-id" placeholder="GCPプロジェクトID" class="bg-stone-900 border border-stone-800 text-xs text-stone-200 px-3 py-1.5 rounded-lg font-mono">
@@ -30,89 +29,93 @@
 
     <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
         
-        <!-- Tactical Advisory (Hero Section) -->
         <div class="bg-stone-900/80 border-2 border-stone-700 p-5 rounded-2xl mb-6 shadow-2xl relative overflow-hidden">
             <div id="status-accent" class="absolute top-0 left-0 w-2 h-full bg-stone-500 transition-colors duration-500"></div>
             <span class="text-[10px] font-black text-stone-500 uppercase tracking-widest block mb-1 ml-3">TACTICAL ADVISORY (サマリー)</span>
             <div id="kpi-status" class="text-lg sm:text-xl font-bold text-stone-200 ml-3 leading-relaxed transition-colors duration-500">データをロードしてください。</div>
         </div>
 
-        <!-- Simulation Controller -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-            <button onclick="app.useSimulation('normal')" id="btn-normal" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-emerald-400 border-l-4 border-l-emerald-500 hover:bg-stone-800 transition-colors shadow">🟢 正常: プレミアム維持</button>
-            <button onclick="app.useSimulation('noise')" id="btn-noise" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-amber-400 border-l-4 border-l-amber-500 hover:bg-stone-800 transition-colors shadow">🟡 ノイズ/流動性警戒</button>
-            <button onclick="app.useSimulation('vacuum')" id="btn-vacuum" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-orange-400 border-l-4 border-l-orange-500 hover:bg-stone-800 transition-colors shadow">🟠 真空: OI枯渇・スプレッド縮小</button>
-            <button onclick="app.useSimulation('collapse')" id="btn-collapse" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-rose-400 border-l-4 border-l-rose-500 hover:bg-stone-800 transition-colors shadow">🔴 崩壊: バブル完全崩壊</button>
+            <button onclick="app.useSimulation('normal')" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-emerald-400 border-l-4 border-l-emerald-500 hover:bg-stone-800 transition-colors">🟢 正常: プレミアム維持</button>
+            <button onclick="app.useSimulation('noise')" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-amber-400 border-l-4 border-l-amber-500 hover:bg-stone-800 transition-colors">🟡 警戒: 実需建玉減少</button>
+            <button onclick="app.useSimulation('vacuum')" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-orange-400 border-l-4 border-l-orange-500 hover:bg-stone-800 transition-colors">🟠 真空: OI枯渇・急縮小</button>
+            <button onclick="app.useSimulation('collapse')" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-rose-400 border-l-4 border-l-rose-500 hover:bg-stone-800 transition-colors">🔴 崩壊: 実需逃避・逆サヤ</button>
         </div>
 
-        <!-- Visual Radar (2x2 Quad Charts) -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <!-- Chart ①: Band Mean HR Time-Series -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
             <div class="glass-panel p-4 rounded-2xl flex flex-col">
                 <div class="mb-3">
                     <span class="text-[9px] font-black text-stone-500 uppercase tracking-widest block">ABSOLUTE LEVEL TRACKER</span>
-                    <h3 class="text-xs font-bold text-stone-200">① バンド平均ヒートレート推移（期近 vs 遠月）</h3>
+                    <h3 class="text-xs font-bold text-stone-200">① バンド平均ヒートレート推移</h3>
                 </div>
                 <div class="chart-container flex-grow"><canvas id="hrChart"></canvas></div>
             </div>
-
-            <!-- Chart ②: Curve Slope Time-Series -->
             <div class="glass-panel p-4 rounded-2xl flex flex-col">
                 <div class="mb-3">
                     <span class="text-[9px] font-black text-stone-500 uppercase tracking-widest block">MACRO DECAY TRACKER</span>
-                    <h3 class="text-xs font-bold text-stone-200">② カーボスロープ推移 (期近 vs 遠月傾きm)</h3>
+                    <h3 class="text-xs font-bold text-stone-200">② カーボスロープ推移 (傾きm)</h3>
                 </div>
                 <div class="chart-container flex-grow"><canvas id="slopeChart"></canvas></div>
             </div>
-
-            <!-- Chart ③: Spatio-Temporal Full-Curve (0M - 24M) -->
             <div class="glass-panel p-4 rounded-2xl flex flex-col">
                 <div class="mb-3">
                     <span class="text-[9px] font-black text-stone-500 uppercase tracking-widest block">SPATIAL SPREAD PROFILER</span>
-                    <h3 class="text-xs font-bold text-stone-200">③ PJM vs ERCOT 24ヶ月フルカーブ断面</h3>
+                    <h3 class="text-xs font-bold text-stone-200">③ PJM vs ERCOT フルカーブ断面</h3>
                 </div>
                 <div class="chart-container flex-grow"><canvas id="crossSectionChart"></canvas></div>
             </div>
+        </div>
 
-            <!-- Chart ④: Liquidity Tracker (OI & Volume) -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <div class="glass-panel p-4 rounded-2xl flex flex-col border-purple-900/30">
                 <div class="mb-3">
                     <span class="text-[9px] font-black text-purple-400 uppercase tracking-widest block">LIQUID GRAVITY TRACKER</span>
-                    <h3 class="text-xs font-bold text-stone-200">④ 遠月(12-24M) 建玉(OI)・出来高推移</h3>
+                    <h3 class="text-xs font-bold text-stone-200">④ 遠月(12-24M) 建玉・出来高推移</h3>
                 </div>
                 <div class="chart-container flex-grow"><canvas id="liqChart"></canvas></div>
             </div>
+            
+            <div class="glass-panel p-4 rounded-2xl flex flex-col border-fuchsia-900/30">
+                <div class="mb-3">
+                    <span class="text-[9px] font-black text-fuchsia-400 uppercase tracking-widest block">CFTC WHALE LEDGER (PHASE 3)</span>
+                    <h3 class="text-xs font-bold text-stone-200">⑤ 実需筋(P/M & SD) ロングポジション総量</h3>
+                </div>
+                <div class="chart-container flex-grow"><canvas id="cftcChart"></canvas></div>
+            </div>
         </div>
 
-        <!-- Tactical KPI Board (Unified 4x1 Layout) -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="kpi-board">
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4" id="kpi-board">
             <div class="bg-stone-950 border border-stone-700 p-4 rounded-xl shadow-inner border-l-4 border-l-cyan-500 flex flex-col justify-between">
-                <span class="text-[10px] text-cyan-400 font-bold block tracking-wider">FAR PJM HR (12-24M)</span>
+                <span class="text-[10px] text-cyan-400 font-bold block tracking-wider">FAR PJM HR</span>
                 <div id="kpi-hr" class="text-2xl sm:text-3xl font-mono font-black text-stone-100 mt-1">---</div>
-                <div class="text-xs text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Near(0-11M): <span id="kpi-near-hr" class="text-stone-300 font-bold">---</span></div>
+                <div class="text-xs text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Near: <span id="kpi-near-hr" class="text-stone-300 font-bold">---</span></div>
             </div>
             <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl shadow-inner border-l-4 border-l-amber-500 flex flex-col justify-between">
                 <span class="text-[10px] text-amber-500 font-bold block tracking-wider">FAR SLOPE (m)</span>
                 <div id="kpi-slope" class="text-2xl sm:text-3xl font-mono font-black text-amber-400 mt-1">---</div>
-                <div class="text-xs text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Near(0-11M): <span id="kpi-near-slope" class="text-stone-300 font-bold">---</span></div>
+                <div class="text-xs text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Near: <span id="kpi-near-slope" class="text-stone-300 font-bold">---</span></div>
             </div>
-            <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl relative overflow-hidden shadow-inner border-l-4 border-l-cyan-500 flex flex-col justify-between">
-                <span class="text-[10px] text-stone-500 font-bold block tracking-wider">FAR PREMIUM SPREAD</span>
+            <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl shadow-inner border-l-4 border-l-cyan-500 flex flex-col justify-between">
+                <span class="text-[10px] text-stone-500 font-bold block tracking-wider">PREMIUM SPREAD</span>
                 <div id="kpi-spread" class="text-2xl sm:text-3xl font-mono font-black text-cyan-400 mt-1">---</div>
                 <div class="text-xs text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Threshold: <span class="text-stone-300 font-bold">15.0%</span></div>
             </div>
-            <!-- KPI ④: Liquidity (OI & Volume) -->
-            <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl relative overflow-hidden shadow-inner border-l-4 border-l-purple-500 flex flex-col justify-between">
+            <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl shadow-inner border-l-4 border-l-purple-500 flex flex-col justify-between">
                 <span class="text-[10px] text-purple-400 font-bold block tracking-wider">FAR OPEN INTEREST</span>
                 <div id="kpi-oi" class="text-2xl sm:text-3xl font-mono font-black text-purple-400 mt-1">---</div>
                 <div class="text-xs text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Volume: <span id="kpi-vol" class="text-stone-300 font-bold">---</span></div>
+            </div>
+            <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl shadow-inner border-l-4 border-l-fuchsia-500 flex flex-col justify-between lg:col-span-1 col-span-2">
+                <span class="text-[10px] text-fuchsia-400 font-bold block tracking-wider">CFTC WHALE LONG</span>
+                <div id="kpi-cftc" class="text-2xl sm:text-3xl font-mono font-black text-fuchsia-400 mt-1">---</div>
+                <div class="text-xs text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Date: <span id="kpi-cftc-date" class="text-stone-300 font-bold font-sans">---</span></div>
             </div>
         </div>
     </main>
 
     <script>
         const app = {
-            hrChart: null, slopeChart: null, csChart: null, liqChart: null,
+            hrChart: null, slopeChart: null, csChart: null, liqChart: null, cftcChart: null,
             xMonths: Array.from({length: 25}, (_, i) => i),
             rawHistoryDocuments: [],
 
@@ -124,69 +127,52 @@
 
             initCharts() {
                 const commonXAxisOptions = {
-                    display: true,
-                    grid: { color: 'rgba(120, 113, 108, 0.05)' },
+                    display: true, grid: { color: 'rgba(120, 113, 108, 0.05)' },
                     ticks: { color: '#78716c', font: { size: 9 }, maxRotation: 45, minRotation: 45, maxTicksLimit: 10 }
                 };
 
                 this.hrChart = new Chart(document.getElementById('hrChart').getContext('2d'), {
-                    type: 'line',
-                    data: {
-                        labels: [],
-                        datasets: [
-                            { label: '遠月平均(12-24M)', data: [], borderColor: '#f5f5f4', borderWidth: 2, pointRadius: 1, tension: 0.2 },
-                            { label: '期近平均(0-11M)', data: [], borderColor: '#78716c', borderWidth: 1.5, borderDash: [2, 2], pointRadius: 0, tension: 0.2 },
-                            { label: '採算臨界線', data: [], borderColor: 'rgba(239, 68, 68, 0.4)', borderDash: [4, 4], borderWidth: 1, pointRadius: 0 }
-                        ]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#a8a29e', font: { size: 9 } } } }, scales: { x: commonXAxisOptions, y: { min: 5.5, max: 9.0, ticks: { color: '#a8a29e', font: { size: 10 } } } } }
+                    type: 'line', data: { labels: [], datasets: [
+                        { label: '遠月平均(12-24M)', data: [], borderColor: '#f5f5f4', borderWidth: 2, pointRadius: 1, tension: 0.2 },
+                        { label: '期近平均(0-11M)', data: [], borderColor: '#78716c', borderWidth: 1.5, borderDash: [2, 2], pointRadius: 0, tension: 0.2 },
+                        { label: '採算臨界線', data: [], borderColor: 'rgba(239, 68, 68, 0.4)', borderDash: [4, 4], borderWidth: 1, pointRadius: 0 }
+                    ]}, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#a8a29e', font: { size: 9 } } } }, scales: { x: commonXAxisOptions, y: { min: 5.5, max: 9.0, ticks: { color: '#a8a29e', font: { size: 10 } } } } }
                 });
 
                 this.slopeChart = new Chart(document.getElementById('slopeChart').getContext('2d'), {
-                    type: 'line',
-                    data: {
-                        labels: [],
-                        datasets: [
-                            { label: '遠月傾き(12-24M)', data: [], borderColor: '#fbbf24', borderWidth: 2, pointRadius: 2, tension: 0.1 },
-                            { label: '期近傾き(0-11M)', data: [], borderColor: '#78716c', borderWidth: 1.5, borderDash: [2, 2], pointRadius: 0, tension: 0.1 },
-                            { label: 'フラット臨界線', data: [], borderColor: 'rgba(239, 68, 68, 0.4)', borderDash: [4, 4], borderWidth: 1, pointRadius: 0 }
-                        ]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#a8a29e', font: { size: 9 } } } }, scales: { x: commonXAxisOptions, y: { min: -0.20, max: 0.20, ticks: { color: '#a8a29e', font: { size: 10 } } } } }
+                    type: 'line', data: { labels: [], datasets: [
+                        { label: '遠月傾き(12-24M)', data: [], borderColor: '#fbbf24', borderWidth: 2, pointRadius: 2, tension: 0.1 },
+                        { label: '期近傾き(0-11M)', data: [], borderColor: '#78716c', borderWidth: 1.5, borderDash: [2, 2], pointRadius: 0, tension: 0.1 },
+                        { label: 'フラット臨界線', data: [], borderColor: 'rgba(239, 68, 68, 0.4)', borderDash: [4, 4], borderWidth: 1, pointRadius: 0 }
+                    ]}, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#a8a29e', font: { size: 9 } } } }, scales: { x: commonXAxisOptions, y: { min: -0.20, max: 0.20, ticks: { color: '#a8a29e', font: { size: 10 } } } } }
                 });
 
                 this.csChart = new Chart(document.getElementById('crossSectionChart').getContext('2d'), {
-                    type: 'line',
-                    data: {
-                        labels: this.xMonths.map(m => `${m}M`),
-                        datasets: [
-                            { label: 'PJM (AI特区)', data: [], borderColor: '#ea580c', backgroundColor: 'rgba(234, 88, 12, 0.15)', borderWidth: 2, pointRadius: 3, fill: true },
-                            { label: 'ERCOT (一般)', data: [], borderColor: '#06b6d4', backgroundColor: 'rgba(6, 182, 212, 0.05)', borderWidth: 2, borderDash: [4, 4], pointRadius: 2, fill: true }
-                        ]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#a8a29e', font: { size: 10 } } } }, scales: { x: { ticks: { color: '#a8a29e', font: { size: 10 } } }, y: { min: 4.5, max: 9.5, ticks: { color: '#a8a29e', font: { size: 10 } } } } }
+                    type: 'line', data: { labels: this.xMonths.map(m => `${m}M`), datasets: [
+                        { label: 'PJM (AI特区)', data: [], borderColor: '#ea580c', backgroundColor: 'rgba(234, 88, 12, 0.15)', borderWidth: 2, pointRadius: 3, fill: true },
+                        { label: 'ERCOT (一般)', data: [], borderColor: '#06b6d4', backgroundColor: 'rgba(6, 182, 212, 0.05)', borderWidth: 2, borderDash: [4, 4], pointRadius: 2, fill: true }
+                    ]}, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#a8a29e', font: { size: 10 } } } }, scales: { x: { ticks: { color: '#a8a29e', font: { size: 10 } } }, y: { min: 4.5, max: 9.5, ticks: { color: '#a8a29e', font: { size: 10 } } } } }
                 });
 
-                // Chart ④: Liquidity Tracker (OI & Volume)
                 this.liqChart = new Chart(document.getElementById('liqChart').getContext('2d'), {
-                    type: 'line',
-                    data: {
-                        labels: [],
-                        datasets: [
-                            { type: 'line', label: '遠月建玉(OI)', data: [], borderColor: '#a855f7', backgroundColor: '#a855f7', borderWidth: 2, pointRadius: 2, tension: 0.1, yAxisID: 'y' },
-                            { type: 'bar', label: '遠月出来高(Vol)', data: [], backgroundColor: 'rgba(168, 85, 247, 0.3)', borderColor: 'rgba(168, 85, 247, 0.6)', borderWidth: 1, yAxisID: 'y1' }
-                        ]
-                    },
-                    options: { 
-                        responsive: true, maintainAspectRatio: false, 
-                        plugins: { legend: { display: true, labels: { color: '#a8a29e', font: { size: 9 } } } }, 
-                        scales: { 
-                            x: commonXAxisOptions, 
-                            y: { type: 'linear', display: true, position: 'left', min: 0, suggestedMax: 4000, ticks: { color: '#a8a29e', font: { size: 10 } }, grid: { color: 'rgba(120, 113, 108, 0.1)' } },
-                            // y1 (Volume) needs its own max calculation or logic to not squish when values are 0
-                            y1: { type: 'linear', display: true, position: 'right', min: 0, suggestedMax: 10, ticks: { color: '#a8a29e', font: { size: 10 } }, grid: { drawOnChartArea: false } }
-                        } 
-                    }
+                    type: 'line', data: { labels: [], datasets: [
+                        { type: 'line', label: '遠月建玉(OI)', data: [], borderColor: '#a855f7', backgroundColor: '#a855f7', borderWidth: 2, pointRadius: 2, tension: 0.1, yAxisID: 'y' },
+                        { type: 'bar', label: '遠月出来高(Vol)', data: [], backgroundColor: 'rgba(168, 85, 247, 0.3)', borderColor: 'rgba(168, 85, 247, 0.6)', borderWidth: 1, yAxisID: 'y1' }
+                    ]}, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#a8a29e', font: { size: 9 } } } }, scales: { 
+                        x: commonXAxisOptions, 
+                        y: { type: 'linear', display: true, position: 'left', min: 0, suggestedMax: 4000, ticks: { color: '#a8a29e', font: { size: 10 } }, grid: { color: 'rgba(120, 113, 108, 0.1)' } },
+                        y1: { type: 'linear', display: true, position: 'right', min: 0, suggestedMax: 10, ticks: { color: '#a8a29e', font: { size: 10 } }, grid: { drawOnChartArea: false } }
+                    } }
+                });
+
+                // Chart ⑤: CFTC Whale Chart - NEW
+                this.cftcChart = new Chart(document.getElementById('cftcChart').getContext('2d'), {
+                    type: 'line', data: { labels: [], datasets: [
+                        { label: '実需＆SD ロング総量', data: [], borderColor: '#d946ef', backgroundColor: 'rgba(217, 70, 239, 0.15)', borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3 }
+                    ]}, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#a8a29e', font: { size: 9 } } } }, scales: { 
+                        x: commonXAxisOptions, 
+                        y: { min: 0, suggestedMax: 15000, ticks: { color: '#a8a29e', font: { size: 10 } }, grid: { color: 'rgba(120, 113, 108, 0.1)' } }
+                    } }
                 });
             },
 
@@ -199,6 +185,7 @@
                 };
                 document.getElementById('slopeChart').onclick = (evt) => syncCrossSection(evt, this.slopeChart);
                 document.getElementById('liqChart').onclick = (evt) => syncCrossSection(evt, this.liqChart);
+                document.getElementById('cftcChart').onclick = (evt) => syncCrossSection(evt, this.cftcChart);
             },
 
             calcLinearRegression(xArr, yArr) {
@@ -237,33 +224,26 @@
                         let near_x = [], near_y = [];
                         if (Object.keys(curveObj).length > 0) {
                             for(let i=0; i<=11; i++) {
-                                if(curveObj[`pjm_hr_${i}m`] !== undefined) {
-                                    near_x.push(i);
-                                    near_y.push(curveObj[`pjm_hr_${i}m`]);
-                                }
+                                if(curveObj[`pjm_hr_${i}m`] !== undefined) { near_x.push(i); near_y.push(curveObj[`pjm_hr_${i}m`]); }
                             }
-                            if(near_x.length > 2) {
-                                const reg = this.calcLinearRegression(near_x, near_y);
-                                near_slope = reg.slope;
-                            }
+                            if(near_x.length > 2) { near_slope = this.calcLinearRegression(near_x, near_y).slope; }
                         }
 
-                        // Safely parse OI and Volume
                         const oi_total = f.far_oi_total ? parseInt(f.far_oi_total.integerValue || f.far_oi_total.doubleValue || 0) : 0;
                         const vol_total = f.far_vol_total ? parseInt(f.far_vol_total.integerValue || f.far_vol_total.doubleValue || 0) : 0;
+                        // Parse CFTC Data
+                        const cftc_whale = f.cftc_whale_long ? parseInt(f.cftc_whale_long.integerValue || f.cftc_whale_long.doubleValue || 0) : 0;
+                        const cftc_dt = f.cftc_date ? f.cftc_date.stringValue : "N/A";
 
                         return {
-                            timestamp_raw: rawDate,
-                            date_short: rawDate ? rawDate.substring(5, 10) : "N/A",
-                            slope: f.slope ? parseFloat(f.slope.doubleValue || f.slope.integerValue) : 0,
-                            near_slope: near_slope,
+                            timestamp_raw: rawDate, date_short: rawDate ? rawDate.substring(5, 10) : "N/A",
+                            slope: f.slope ? parseFloat(f.slope.doubleValue || f.slope.integerValue) : 0, near_slope: near_slope,
                             band_mean_hr: f.band_mean_hr ? parseFloat(f.band_mean_hr.doubleValue || f.band_mean_hr.integerValue) : 0,
                             band_mean_near_hr: f.band_mean_near_hr ? parseFloat(f.band_mean_near_hr.doubleValue || f.band_mean_near_hr.integerValue) : 7.0,
                             band_mean_spread: f.band_mean_spread ? parseFloat(f.band_mean_spread.doubleValue || f.band_mean_spread.integerValue) : 0,
-                            far_oi_total: oi_total,
-                            far_vol_total: vol_total,
-                            state: f.state ? f.state.stringValue : "Unknown",
-                            curve: curveObj
+                            far_oi_total: oi_total, far_vol_total: vol_total,
+                            cftc_whale_long: cftc_whale, cftc_date: cftc_dt,
+                            state: f.state ? f.state.stringValue : "Unknown", curve: curveObj
                         };
                     });
                     this.renderLiveHistory();
@@ -276,29 +256,18 @@
                 const displayData = this.rawHistoryDocuments.slice(-60);
                 const labels = displayData.map(d => d.date_short);
                 
-                this.hrChart.data.labels = labels;
-                this.hrChart.data.datasets[0].data = displayData.map(d => d.band_mean_hr);
-                this.hrChart.data.datasets[1].data = displayData.map(d => d.band_mean_near_hr);
-                this.hrChart.data.datasets[2].data = Array(displayData.length).fill(7.0);
-                this.hrChart.update();
+                this.hrChart.data.labels = labels; this.hrChart.data.datasets[0].data = displayData.map(d => d.band_mean_hr); this.hrChart.data.datasets[1].data = displayData.map(d => d.band_mean_near_hr); this.hrChart.data.datasets[2].data = Array(displayData.length).fill(7.0); this.hrChart.update();
+                this.slopeChart.data.labels = labels; this.slopeChart.data.datasets[0].data = displayData.map(d => d.slope); this.slopeChart.data.datasets[1].data = displayData.map(d => d.near_slope); this.slopeChart.data.datasets[2].data = Array(displayData.length).fill(0); this.slopeChart.update();
 
-                this.slopeChart.data.labels = labels;
-                this.slopeChart.data.datasets[0].data = displayData.map(d => d.slope);
-                this.slopeChart.data.datasets[1].data = displayData.map(d => d.near_slope);
-                this.slopeChart.data.datasets[2].data = Array(displayData.length).fill(0);
-                this.slopeChart.update();
-
-                // Update Liquidity Chart
                 const volumes = displayData.map(d => d.far_vol_total);
-                const maxVol = Math.max(...volumes, 10); // Ensure Y1 axis doesn't collapse to 1.0 when all 0s
+                this.liqChart.options.scales.y1.max = Math.ceil(Math.max(...volumes, 10) * 1.2); 
+                this.liqChart.data.labels = labels; this.liqChart.data.datasets[0].data = displayData.map(d => d.far_oi_total); this.liqChart.data.datasets[1].data = volumes; this.liqChart.update();
                 
-                this.liqChart.options.scales.y1.max = Math.ceil(maxVol * 1.2); // Add 20% headroom
-                
-                this.liqChart.data.labels = labels;
-                this.liqChart.data.datasets[0].data = displayData.map(d => d.far_oi_total);
-                this.liqChart.data.datasets[1].data = volumes;
-                this.liqChart.update();
-                
+                // Update CFTC Chart
+                this.cftcChart.data.labels = labels;
+                this.cftcChart.data.datasets[0].data = displayData.map(d => d.cftc_whale_long);
+                this.cftcChart.update();
+
                 this.updateCrossSectionFromHistory(displayData.length - 1);
             },
 
@@ -309,10 +278,7 @@
                 
                 const pjmY = this.xMonths.map(m => dayData.curve[`pjm_hr_${m}m`] || 0);
                 const ercotY = this.xMonths.map(m => dayData.curve[`ercot_hr_${m}m`] || 0);
-                
-                this.csChart.data.datasets[0].data = pjmY;
-                this.csChart.data.datasets[1].data = ercotY;
-                this.csChart.update();
+                this.csChart.data.datasets[0].data = pjmY; this.csChart.data.datasets[1].data = ercotY; this.csChart.update();
                 
                 document.getElementById('kpi-near-hr').textContent = dayData.band_mean_near_hr.toFixed(2);
                 document.getElementById('kpi-hr').textContent = dayData.band_mean_hr.toFixed(2);
@@ -321,10 +287,14 @@
                 document.getElementById('kpi-spread').textContent = dayData.band_mean_spread.toFixed(1) + "%";
                 document.getElementById('kpi-spread').className = dayData.band_mean_spread > 15 ? "text-2xl sm:text-3xl font-mono font-black text-cyan-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
                 
-                // Update Liquidity KPIs
                 document.getElementById('kpi-oi').textContent = dayData.far_oi_total.toLocaleString();
                 document.getElementById('kpi-vol').textContent = dayData.far_vol_total.toLocaleString();
                 document.getElementById('kpi-oi').className = dayData.far_oi_total > 500 ? "text-2xl sm:text-3xl font-mono font-black text-purple-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
+
+                // Update CFTC KPIs
+                document.getElementById('kpi-cftc').textContent = dayData.cftc_whale_long > 0 ? dayData.cftc_whale_long.toLocaleString() : "---";
+                document.getElementById('kpi-cftc-date').textContent = dayData.cftc_date || "N/A";
+                document.getElementById('kpi-cftc').className = dayData.cftc_whale_long > 5000 ? "text-2xl sm:text-3xl font-mono font-black text-fuchsia-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
 
                 const adv = document.getElementById('kpi-status');
                 const acc = document.getElementById('status-accent');
@@ -337,41 +307,36 @@
 
             useSimulation(mode) {
                 this.rawHistoryDocuments = [];
-                let hrFar = [], hrNear = [], ts = [], tsNear = [], pjmY = [], ercotY = [], oi = [], vol = [], spread = 0, state = "";
+                let hrFar = [], hrNear = [], ts = [], tsNear = [], pjmY = [], ercotY = [], oi = [], vol = [], cftc = [], spread = 0, state = "";
                 let dummyDates = []; let d = new Date(); d.setDate(d.getDate() - 60);
                 for(let i=0; i<60; i++) { d.setDate(d.getDate() + 1); dummyDates.push(`${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`); }
 
                 if (mode === 'normal') {
-                    for(let i=0; i<60; i++) { hrFar.push(7.9); hrNear.push(7.1); ts.push(0.05); tsNear.push(0.02); oi.push(2500 + Math.random()*200); vol.push(150 + Math.random()*50); }
-                    pjmY = this.xMonths.map(x => x >= 12 ? 7.4 + (x-12)*0.05 : 6.8 + x*0.02);
-                    ercotY = this.xMonths.map(x => x >= 12 ? 6.1 + (x-12)*0.02 : 5.8 + x*0.01);
-                    spread = 25.0; state = "🟢 【正常】AIプレミアム＆OI(建玉) 堅調維持";
+                    for(let i=0; i<60; i++) { hrFar.push(7.9); hrNear.push(7.1); ts.push(0.05); tsNear.push(0.02); oi.push(2500+Math.random()*200); vol.push(150); cftc.push(12500+Math.random()*500); }
+                    pjmY = this.xMonths.map(x => x >= 12 ? 7.4 + (x-12)*0.05 : 6.8 + x*0.02); ercotY = this.xMonths.map(x => x >= 12 ? 6.1 + (x-12)*0.02 : 5.8 + x*0.01);
+                    spread = 25.0; state = "🟢 【正常】AIプレミアム＆実需OI(建玉) 堅調維持";
                 } else if (mode === 'noise') {
-                    for(let i=0; i<60; i++) { hrFar.push(6.8); hrNear.push(6.5); ts.push(0.05); tsNear.push(0.02); oi.push(2400); vol.push(120); }
-                    pjmY = this.xMonths.map(x => x >= 12 ? 7.2 + (x-12)*0.05 : 6.6 + x*0.02);
-                    ercotY = this.xMonths.map(x => x >= 12 ? 5.9 + (x-12)*0.02 : 5.6 + x*0.01);
-                    spread = 19.2; state = "🟡 【流動性低下】価格維持するも建玉減少(警戒)";
+                    for(let i=0; i<60; i++) { hrFar.push(6.8); hrNear.push(6.5); ts.push(0.05); tsNear.push(0.02); oi.push(2400); vol.push(120); cftc.push(12000); }
+                    pjmY = this.xMonths.map(x => x >= 12 ? 7.2 + (x-12)*0.05 : 6.6 + x*0.02); ercotY = this.xMonths.map(x => x >= 12 ? 5.9 + (x-12)*0.02 : 5.6 + x*0.01);
+                    spread = 19.2; state = "🟡 【流動性低下】価格維持するも実需建玉減少(警戒)";
                 } else if (mode === 'vacuum') {
-                    for(let i=0; i<60; i++) { hrFar.push(7.5); hrNear.push(7.2); ts.push(0.01); tsNear.push(0.03); oi.push(1500 - i*20); vol.push(50); }
-                    pjmY = this.xMonths.map(x => x >= 12 ? 7.0 + (x-12)*0.01 : 6.5 + x*0.03);
-                    ercotY = this.xMonths.map(x => x >= 12 ? 6.1 + (x-12)*0.01 : 5.7 + x*0.01);
+                    for(let i=0; i<60; i++) { hrFar.push(7.5); hrNear.push(7.2); ts.push(0.01); tsNear.push(0.03); oi.push(1500-i*20); vol.push(50); cftc.push(8000-i*100); }
+                    pjmY = this.xMonths.map(x => x >= 12 ? 7.0 + (x-12)*0.01 : 6.5 + x*0.03); ercotY = this.xMonths.map(x => x >= 12 ? 6.1 + (x-12)*0.01 : 5.7 + x*0.01);
                     spread = 14.7; state = "🟠 【真空状態】流動性枯渇・スプレッド急縮小";
                 } else if (mode === 'collapse') {
-                    for(let i=0; i<60; i++) { hrFar.push(6.2); hrNear.push(6.8); ts.push(-0.08); tsNear.push(-0.02); oi.push(100); vol.push(10); }
-                    pjmY = this.xMonths.map(x => x >= 12 ? 6.4 - (x-12)*0.08 : 7.0 - x*0.02);
-                    ercotY = this.xMonths.map(x => 5.9);
-                    spread = 4.2; state = "🔴 【崩壊確定】OI消失・逆サヤ化。バブル完全崩壊";
+                    for(let i=0; i<60; i++) { hrFar.push(6.2); hrNear.push(6.8); ts.push(-0.08); tsNear.push(-0.02); oi.push(100); vol.push(10); cftc.push(2000); }
+                    pjmY = this.xMonths.map(x => x >= 12 ? 6.4 - (x-12)*0.08 : 7.0 - x*0.02); ercotY = this.xMonths.map(x => 5.9);
+                    spread = 4.2; state = "🔴 【崩壊確定】OI消失・実需逃避。バブル完全崩壊";
                 }
                 
                 this.hrChart.data.labels = dummyDates; this.hrChart.data.datasets[0].data = hrFar; this.hrChart.data.datasets[1].data = hrNear; this.hrChart.data.datasets[2].data = Array(60).fill(7.0); this.hrChart.update();
                 this.slopeChart.data.labels = dummyDates; this.slopeChart.data.datasets[0].data = ts; this.slopeChart.data.datasets[1].data = tsNear; this.slopeChart.data.datasets[2].data = Array(60).fill(0); this.slopeChart.update();
                 this.csChart.data.datasets[0].data = pjmY; this.csChart.data.datasets[1].data = ercotY; this.csChart.update();
-                
-                // Simulate Liquidity Chart
-                const maxVol = Math.max(...vol, 10);
-                this.liqChart.options.scales.y1.max = Math.ceil(maxVol * 1.2);
-                
+                this.liqChart.options.scales.y1.max = Math.ceil(Math.max(...vol, 10) * 1.2);
                 this.liqChart.data.labels = dummyDates; this.liqChart.data.datasets[0].data = oi; this.liqChart.data.datasets[1].data = vol; this.liqChart.update();
+                
+                // Simulate CFTC Chart
+                this.cftcChart.data.labels = dummyDates; this.cftcChart.data.datasets[0].data = cftc; this.cftcChart.update();
 
                 document.getElementById('kpi-near-hr').textContent = hrNear[59].toFixed(2);
                 document.getElementById('kpi-hr').textContent = hrFar[59].toFixed(2);
@@ -379,13 +344,16 @@
                 document.getElementById('kpi-near-slope').textContent = (tsNear[59] >= 0 ? '+' : '') + tsNear[59].toFixed(4);
                 document.getElementById('kpi-spread').textContent = spread.toFixed(1) + "%";
                 document.getElementById('kpi-spread').className = spread > 15 ? "text-2xl sm:text-3xl font-mono font-black text-cyan-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
-                
                 document.getElementById('kpi-oi').textContent = Math.floor(oi[59]).toLocaleString();
                 document.getElementById('kpi-vol').textContent = Math.floor(vol[59]).toLocaleString();
                 document.getElementById('kpi-oi').className = oi[59] > 500 ? "text-2xl sm:text-3xl font-mono font-black text-purple-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
+                
+                // Simulate CFTC KPIs
+                document.getElementById('kpi-cftc').textContent = Math.floor(cftc[59]).toLocaleString();
+                document.getElementById('kpi-cftc-date').textContent = "Simulated";
+                document.getElementById('kpi-cftc').className = cftc[59] > 5000 ? "text-2xl sm:text-3xl font-mono font-black text-fuchsia-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
 
-                const adv = document.getElementById('kpi-status');
-                const acc = document.getElementById('status-accent');
+                const adv = document.getElementById('kpi-status'); const acc = document.getElementById('status-accent');
                 adv.textContent = state;
                 if (state.includes("🟢")) { adv.className = "text-lg sm:text-xl font-bold text-emerald-400 ml-3 leading-relaxed transition-colors duration-500"; acc.className = "absolute top-0 left-0 w-2 h-full bg-emerald-500 transition-colors duration-500"; }
                 else if (state.includes("🟡")) { adv.className = "text-lg sm:text-xl font-bold text-amber-400 ml-3 leading-relaxed transition-colors duration-500"; acc.className = "absolute top-0 left-0 w-2 h-full bg-amber-500 transition-colors duration-500"; }
