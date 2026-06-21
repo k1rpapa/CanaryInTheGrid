@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CanaryTerminal v3.9.1 Tactical Dashboard</title>
+    <title>CanaryTerminal v4.0 Liquid Gravity UI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -18,8 +18,8 @@
     <nav class="bg-stone-950 border-b border-stone-800 text-stone-100 sticky top-0 z-50 shadow-md">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between h-auto sm:h-16 items-center py-3 sm:py-0">
             <div class="flex items-center mb-3 sm:mb-0">
-                <span class="text-sm font-black tracking-widest text-stone-100">🐦 CANARY TERMINAL v3.9.1</span>
-                <span class="text-[9px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded-full ml-3 font-mono">TACTICAL UI</span>
+                <span class="text-sm font-black tracking-widest text-stone-100">🐦 CANARY TERMINAL v4.0</span>
+                <span class="text-[9px] bg-purple-500/20 text-purple-400 border border-purple-500/30 px-2 py-0.5 rounded-full ml-3 font-mono">LIQUID GRAVITY UI</span>
             </div>
             <div class="flex items-center space-x-2">
                 <input type="text" id="gcp-project-id" placeholder="GCPプロジェクトID" class="bg-stone-900 border border-stone-800 text-xs text-stone-200 px-3 py-1.5 rounded-lg font-mono">
@@ -40,13 +40,13 @@
         <!-- Simulation Controller -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
             <button onclick="app.useSimulation('normal')" id="btn-normal" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-emerald-400 border-l-4 border-l-emerald-500 hover:bg-stone-800 transition-colors shadow">🟢 正常: プレミアム維持</button>
-            <button onclick="app.useSimulation('noise')" id="btn-noise" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-amber-400 border-l-4 border-l-amber-500 hover:bg-stone-800 transition-colors shadow">🟡 ノイズ: 一時的低下</button>
-            <button onclick="app.useSimulation('vacuum')" id="btn-vacuum" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-orange-400 border-l-4 border-l-orange-500 hover:bg-stone-800 transition-colors shadow">🟠 真空: スプレッド縮小</button>
-            <button onclick="app.useSimulation('collapse')" id="btn-collapse" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-rose-400 border-l-4 border-l-rose-500 hover:bg-stone-800 transition-colors shadow">🔴 崩壊: プレミアム剥落</button>
+            <button onclick="app.useSimulation('noise')" id="btn-noise" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-amber-400 border-l-4 border-l-amber-500 hover:bg-stone-800 transition-colors shadow">🟡 ノイズ/流動性警戒</button>
+            <button onclick="app.useSimulation('vacuum')" id="btn-vacuum" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-orange-400 border-l-4 border-l-orange-500 hover:bg-stone-800 transition-colors shadow">🟠 真空: OI枯渇・スプレッド縮小</button>
+            <button onclick="app.useSimulation('collapse')" id="btn-collapse" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-rose-400 border-l-4 border-l-rose-500 hover:bg-stone-800 transition-colors shadow">🔴 崩壊: バブル完全崩壊</button>
         </div>
 
-        <!-- Visual Radar (3 Main Charts) -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <!-- Visual Radar (2x2 Quad Charts) -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <!-- Chart ①: Band Mean HR Time-Series -->
             <div class="glass-panel p-4 rounded-2xl flex flex-col">
                 <div class="mb-3">
@@ -73,10 +73,19 @@
                 </div>
                 <div class="chart-container flex-grow"><canvas id="crossSectionChart"></canvas></div>
             </div>
+
+            <!-- Chart ④: Liquidity Tracker (OI & Volume) - NEW -->
+            <div class="glass-panel p-4 rounded-2xl flex flex-col border-purple-900/30">
+                <div class="mb-3">
+                    <span class="text-[9px] font-black text-purple-400 uppercase tracking-widest block">LIQUID GRAVITY TRACKER</span>
+                    <h3 class="text-xs font-bold text-stone-200">④ 遠月(12-24M) 建玉(OI)・出来高推移</h3>
+                </div>
+                <div class="chart-container flex-grow"><canvas id="liqChart"></canvas></div>
+            </div>
         </div>
 
-        <!-- Tactical KPI Board (Unified 3x3 Layout) -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4" id="kpi-board">
+        <!-- Tactical KPI Board (Unified 4x1 Layout) -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="kpi-board">
             <div class="bg-stone-950 border border-stone-700 p-4 rounded-xl shadow-inner border-l-4 border-l-cyan-500 flex flex-col justify-between">
                 <span class="text-[10px] text-cyan-400 font-bold block tracking-wider">FAR PJM HR (12-24M)</span>
                 <div id="kpi-hr" class="text-2xl sm:text-3xl font-mono font-black text-stone-100 mt-1">---</div>
@@ -92,12 +101,18 @@
                 <div id="kpi-spread" class="text-2xl sm:text-3xl font-mono font-black text-cyan-400 mt-1">---</div>
                 <div class="text-xs text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Threshold: <span class="text-stone-300 font-bold">15.0%</span></div>
             </div>
+            <!-- KPI ④: Liquidity (OI & Volume) - NEW -->
+            <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl relative overflow-hidden shadow-inner border-l-4 border-l-purple-500 flex flex-col justify-between">
+                <span class="text-[10px] text-purple-400 font-bold block tracking-wider">FAR OPEN INTEREST</span>
+                <div id="kpi-oi" class="text-2xl sm:text-3xl font-mono font-black text-purple-400 mt-1">---</div>
+                <div class="text-xs text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Volume: <span id="kpi-vol" class="text-stone-300 font-bold">---</span></div>
+            </div>
         </div>
     </main>
 
     <script>
         const app = {
-            hrChart: null, slopeChart: null, csChart: null,
+            hrChart: null, slopeChart: null, csChart: null, liqChart: null,
             xMonths: Array.from({length: 25}, (_, i) => i),
             rawHistoryDocuments: [],
 
@@ -154,15 +169,38 @@
                     },
                     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#a8a29e', font: { size: 10 } } } }, scales: { x: { ticks: { color: '#a8a29e', font: { size: 10 } } }, y: { min: 4.5, max: 9.5, ticks: { color: '#a8a29e', font: { size: 10 } } } } }
                 });
+
+                // Chart ④: Liquidity Tracker (OI & Volume) - NEW
+                this.liqChart = new Chart(document.getElementById('liqChart').getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [
+                            { type: 'line', label: '遠月建玉(OI)', data: [], borderColor: '#a855f7', backgroundColor: '#a855f7', borderWidth: 2, pointRadius: 2, tension: 0.1, yAxisID: 'y' },
+                            { type: 'bar', label: '遠月出来高(Vol)', data: [], backgroundColor: 'rgba(168, 85, 247, 0.3)', borderColor: 'rgba(168, 85, 247, 0.6)', borderWidth: 1, yAxisID: 'y1' }
+                        ]
+                    },
+                    options: { 
+                        responsive: true, maintainAspectRatio: false, 
+                        plugins: { legend: { display: true, labels: { color: '#a8a29e', font: { size: 9 } } } }, 
+                        scales: { 
+                            x: commonXAxisOptions, 
+                            y: { type: 'linear', display: true, position: 'left', min: 0, ticks: { color: '#a8a29e', font: { size: 10 } }, grid: { color: 'rgba(120, 113, 108, 0.1)' } },
+                            y1: { type: 'linear', display: true, position: 'right', min: 0, ticks: { color: '#a8a29e', font: { size: 10 } }, grid: { drawOnChartArea: false } }
+                        } 
+                    }
+                });
             },
 
             bindChartInteractions() {
-                document.getElementById('slopeChart').onclick = (evt) => {
-                    const points = this.slopeChart.getElementsAtEventForMode(evt, 'index', { intersect: false }, true);
+                const syncCrossSection = (evt, chartInstance) => {
+                    const points = chartInstance.getElementsAtEventForMode(evt, 'index', { intersect: false }, true);
                     if (points.length > 0 && this.rawHistoryDocuments.length > 0) {
                         this.updateCrossSectionFromHistory(points[0].index);
                     }
                 };
+                document.getElementById('slopeChart').onclick = (evt) => syncCrossSection(evt, this.slopeChart);
+                document.getElementById('liqChart').onclick = (evt) => syncCrossSection(evt, this.liqChart);
             },
 
             calcLinearRegression(xArr, yArr) {
@@ -197,7 +235,6 @@
                         }
                         let rawDate = f.timestamp_jst ? f.timestamp_jst.stringValue : (f.timestamp ? f.timestamp.stringValue : "");
                         
-                        // 動的に期近の傾き(Near Slope)を計算
                         let near_slope = 0;
                         let near_x = [], near_y = [];
                         if (Object.keys(curveObj).length > 0) {
@@ -213,6 +250,10 @@
                             }
                         }
 
+                        // NEW: Parse far_oi_total and far_vol_total safely (handle old records gracefully)
+                        const oi_total = f.far_oi_total ? parseInt(f.far_oi_total.integerValue || f.far_oi_total.doubleValue || 0) : 0;
+                        const vol_total = f.far_vol_total ? parseInt(f.far_vol_total.integerValue || f.far_vol_total.doubleValue || 0) : 0;
+
                         return {
                             timestamp_raw: rawDate,
                             date_short: rawDate ? rawDate.substring(5, 10) : "N/A",
@@ -221,6 +262,8 @@
                             band_mean_hr: f.band_mean_hr ? parseFloat(f.band_mean_hr.doubleValue || f.band_mean_hr.integerValue) : 0,
                             band_mean_near_hr: f.band_mean_near_hr ? parseFloat(f.band_mean_near_hr.doubleValue || f.band_mean_near_hr.integerValue) : 7.0,
                             band_mean_spread: f.band_mean_spread ? parseFloat(f.band_mean_spread.doubleValue || f.band_mean_spread.integerValue) : 0,
+                            far_oi_total: oi_total,
+                            far_vol_total: vol_total,
                             state: f.state ? f.state.stringValue : "Unknown",
                             curve: curveObj
                         };
@@ -246,6 +289,12 @@
                 this.slopeChart.data.datasets[1].data = displayData.map(d => d.near_slope);
                 this.slopeChart.data.datasets[2].data = Array(displayData.length).fill(0);
                 this.slopeChart.update();
+
+                // NEW: Update Liquidity Chart
+                this.liqChart.data.labels = labels;
+                this.liqChart.data.datasets[0].data = displayData.map(d => d.far_oi_total);
+                this.liqChart.data.datasets[1].data = displayData.map(d => d.far_vol_total);
+                this.liqChart.update();
                 
                 this.updateCrossSectionFromHistory(displayData.length - 1);
             },
@@ -269,6 +318,11 @@
                 document.getElementById('kpi-spread').textContent = dayData.band_mean_spread.toFixed(1) + "%";
                 document.getElementById('kpi-spread').className = dayData.band_mean_spread > 15 ? "text-2xl sm:text-3xl font-mono font-black text-cyan-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
                 
+                // NEW: Update Liquidity KPIs
+                document.getElementById('kpi-oi').textContent = dayData.far_oi_total.toLocaleString();
+                document.getElementById('kpi-vol').textContent = dayData.far_vol_total.toLocaleString();
+                document.getElementById('kpi-oi').className = dayData.far_oi_total > 500 ? "text-2xl sm:text-3xl font-mono font-black text-purple-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
+
                 const adv = document.getElementById('kpi-status');
                 const acc = document.getElementById('status-accent');
                 adv.textContent = dayData.state;
@@ -280,36 +334,39 @@
 
             useSimulation(mode) {
                 this.rawHistoryDocuments = [];
-                let hrFar = [], hrNear = [], ts = [], tsNear = [], pjmY = [], ercotY = [], spread = 0, state = "";
+                let hrFar = [], hrNear = [], ts = [], tsNear = [], pjmY = [], ercotY = [], oi = [], vol = [], spread = 0, state = "";
                 let dummyDates = []; let d = new Date(); d.setDate(d.getDate() - 60);
                 for(let i=0; i<60; i++) { d.setDate(d.getDate() + 1); dummyDates.push(`${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`); }
 
                 if (mode === 'normal') {
-                    for(let i=0; i<60; i++) { hrFar.push(7.9); hrNear.push(7.1); ts.push(0.05); tsNear.push(0.02); }
+                    for(let i=0; i<60; i++) { hrFar.push(7.9); hrNear.push(7.1); ts.push(0.05); tsNear.push(0.02); oi.push(2500 + Math.random()*200); vol.push(150 + Math.random()*50); }
                     pjmY = this.xMonths.map(x => x >= 12 ? 7.4 + (x-12)*0.05 : 6.8 + x*0.02);
                     ercotY = this.xMonths.map(x => x >= 12 ? 6.1 + (x-12)*0.02 : 5.8 + x*0.01);
-                    spread = 25.0; state = "🟢 【正常】AIプレミアム維持・順サヤ巡航。未来の割高感が綺麗に描画中。";
+                    spread = 25.0; state = "🟢 【正常】AIプレミアム＆OI(建玉) 堅調維持";
                 } else if (mode === 'noise') {
-                    for(let i=0; i<60; i++) { hrFar.push(7.7); hrNear.push(7.0); ts.push(0.05); tsNear.push(0.02); }
+                    for(let i=0; i<60; i++) { hrFar.push(6.8); hrNear.push(6.5); ts.push(0.05); tsNear.push(0.02); oi.push(2400); vol.push(120); }
                     pjmY = this.xMonths.map(x => x >= 12 ? 7.2 + (x-12)*0.05 : 6.6 + x*0.02);
                     ercotY = this.xMonths.map(x => x >= 12 ? 5.9 + (x-12)*0.02 : 5.6 + x*0.01);
-                    spread = 19.2; state = "🟡 【偽陽性】絶対水準低下(全体ノイズ)。スプレッド維持につき無視せよ。";
+                    spread = 19.2; state = "🟡 【流動性低下】価格維持するも建玉減少(警戒)";
                 } else if (mode === 'vacuum') {
-                    for(let i=0; i<60; i++) { hrFar.push(7.5); hrNear.push(7.2); ts.push(0.01); tsNear.push(0.03); }
+                    for(let i=0; i<60; i++) { hrFar.push(7.5); hrNear.push(7.2); ts.push(0.01); tsNear.push(0.03); oi.push(1500 - i*20); vol.push(50); }
                     pjmY = this.xMonths.map(x => x >= 12 ? 7.0 + (x-12)*0.01 : 6.5 + x*0.03);
                     ercotY = this.xMonths.map(x => x >= 12 ? 6.1 + (x-12)*0.01 : 5.7 + x*0.01);
-                    spread = 14.7; state = "🟠 【真空状態】スプレッド縮小・カーブ水平化。ショートの配置準備を開始せよ。";
+                    spread = 14.7; state = "🟠 【真空状態】流動性枯渇・スプレッド急縮小";
                 } else if (mode === 'collapse') {
-                    for(let i=0; i<60; i++) { hrFar.push(6.2); hrNear.push(6.8); ts.push(-0.08); tsNear.push(-0.02); }
+                    for(let i=0; i<60; i++) { hrFar.push(6.2); hrNear.push(6.8); ts.push(-0.08); tsNear.push(-0.02); oi.push(100); vol.push(10); }
                     pjmY = this.xMonths.map(x => x >= 12 ? 6.4 - (x-12)*0.08 : 7.0 - x*0.02);
                     ercotY = this.xMonths.map(x => 5.9);
-                    spread = 4.2; state = "🔴 【崩壊確定】AIプレミアム完全剥落・逆サヤ化。フルショートを敢行せよ。";
+                    spread = 4.2; state = "🔴 【崩壊確定】OI消失・逆サヤ化。バブル完全崩壊";
                 }
                 
                 this.hrChart.data.labels = dummyDates; this.hrChart.data.datasets[0].data = hrFar; this.hrChart.data.datasets[1].data = hrNear; this.hrChart.data.datasets[2].data = Array(60).fill(7.0); this.hrChart.update();
                 this.slopeChart.data.labels = dummyDates; this.slopeChart.data.datasets[0].data = ts; this.slopeChart.data.datasets[1].data = tsNear; this.slopeChart.data.datasets[2].data = Array(60).fill(0); this.slopeChart.update();
                 this.csChart.data.datasets[0].data = pjmY; this.csChart.data.datasets[1].data = ercotY; this.csChart.update();
                 
+                // NEW: Simulate Liquidity
+                this.liqChart.data.labels = dummyDates; this.liqChart.data.datasets[0].data = oi; this.liqChart.data.datasets[1].data = vol; this.liqChart.update();
+
                 document.getElementById('kpi-near-hr').textContent = hrNear[59].toFixed(2);
                 document.getElementById('kpi-hr').textContent = hrFar[59].toFixed(2);
                 document.getElementById('kpi-slope').textContent = (ts[59] >= 0 ? '+' : '') + ts[59].toFixed(4);
@@ -317,6 +374,10 @@
                 document.getElementById('kpi-spread').textContent = spread.toFixed(1) + "%";
                 document.getElementById('kpi-spread').className = spread > 15 ? "text-2xl sm:text-3xl font-mono font-black text-cyan-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
                 
+                document.getElementById('kpi-oi').textContent = Math.floor(oi[59]).toLocaleString();
+                document.getElementById('kpi-vol').textContent = Math.floor(vol[59]).toLocaleString();
+                document.getElementById('kpi-oi').className = oi[59] > 500 ? "text-2xl sm:text-3xl font-mono font-black text-purple-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
+
                 const adv = document.getElementById('kpi-status');
                 const acc = document.getElementById('status-accent');
                 adv.textContent = state;
