@@ -9,7 +9,7 @@ from google.cloud import firestore
 from datetime import datetime, timezone, timedelta
 
 # =========================================================================
-# CanaryInTheGrid v4.5 - Phase 3: CFTC Whale Ledger (Root B)
+# CanaryInTheGrid v4.6 - Phase 3: CFTC Macro Proxy (Root A - Henry Hub)
 # =========================================================================
 
 ALL_MONTHS = list(range(0, 25))
@@ -35,42 +35,36 @@ def safe_int(value):
         return int(value.replace(',', '').split('.')[0])
     return int(value)
 
-def fetch_cftc_power_index():
-    """CFTC API(Socrata)から電力市場の実需筋＆スワップディーラーの買いを合算抽出"""
-    print("[*] Infiltrating CFTC Socrata API for Power Market Ledgers...")
+def fetch_cftc_macro_proxy():
+    """CFTC APIからマクロ・プロキシ（ヘンリーハブ天然ガス）の実需＆SDロングを取得"""
+    print("[*] Infiltrating CFTC Socrata API for Macro Proxy (Henry Hub)...")
     # CFTC Disaggregated Futures Only Report Endpoint
     url = "https://publicreporting.cftc.gov/resource/72hh-3qng.json"
     
-    # PJM, ERCOT等の代表的なCFTCコントラクトコード（複数市場の合算インデックス用）
-    power_codes = ["064651", "064655", "064A57"] 
-    
-    whale_long_total = 0
-    report_date = "N/A"
+    # Henry Hub Natural Gas (NYMEX) のCFTCコントラクトコード
+    macro_proxy_code = "023651" 
     
     try:
-        for code in power_codes:
-            # 最新のレポートを1件だけ取得
-            query = f"{url}?cftc_contract_market_code={code}&$order=report_date_as_yyyy_mm_dd DESC&$limit=1"
-            response = requests.get(query, timeout=10)
-            
-            if response.status_code == 200 and len(response.json()) > 0:
-                data = response.json()[0]
-                report_date = data.get("report_date_as_yyyy_mm_dd", report_date)[:10]
-                
-                # 実需(Producer/Merchant)とSwap Dealersの買いポジション(ロング)を合算
-                pm_long = float(data.get("prod_merc_positions_long", 0))
-                sd_long = float(data.get("swap_positions_long", 0))
-                whale_long_total += (pm_long + sd_long)
-                
-        if whale_long_total == 0:
-            raise Exception("No significant positions found.")
-            
-        print(f"[+] CFTC Whales Identified (Date: {report_date}): {whale_long_total} contracts")
-        return whale_long_total, report_date
+        # 最新のレポートを1件だけ取得
+        query = f"{url}?cftc_contract_market_code={macro_proxy_code}&$order=report_date_as_yyyy_mm_dd DESC&$limit=1"
+        response = requests.get(query, timeout=10)
         
+        if response.status_code == 200 and len(response.json()) > 0:
+            data = response.json()[0]
+            report_date = data.get("report_date_as_yyyy_mm_dd", "N/A")[:10]
+            
+            # 天然ガス市場における実需(Producer/Merchant)とSwap Dealersの買いポジション(ロング)を合算
+            pm_long = float(data.get("prod_merc_positions_long", 0))
+            sd_long = float(data.get("swap_positions_long", 0))
+            whale_long_total = pm_long + sd_long
+            
+            print(f"[+] CFTC Macro Proxy Identified (Date: {report_date}): {whale_long_total} contracts")
+            return whale_long_total, report_date
+        else:
+            raise Exception("API returned empty data.")
+            
     except Exception as e:
-        print(f"[!] CFTC Fetch Warning: {e}. Engaging simulated ledger.")
-        # API障害やデータ欠損時のタクティカル・フォールバック
+        print(f"[!] CFTC Fetch Error: {e}. Engaging simulated ledger.")
         return 12500, "Simulated"
 
 def fetch_cme_curve(product_id, default_start_price, default_step):
@@ -169,19 +163,19 @@ def calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, 
     slope, _ = statistics.linear_regression(FAR_MONTHS, pjm_far_hrs)
     
     LIQUIDITY_WARNING = pjm_far_oi_total < 500
-    # Phase 3: CFTCの実需クジラが逃げているかどうかの判定を追加
-    WHALE_WARNING = cftc_whale_long < 5000 
+    # ヘンリーハブ(プロキシ)の閾値は非常に大きいため調整が必要(仮で100,000とする)
+    WHALE_WARNING = cftc_whale_long < 100000 
     
     if band_mean_far_hr < 7.0 and slope < 0 and LIQUIDITY_WARNING and WHALE_WARNING:
-        state = "🔴 【崩壊確定】OI消失・実需逃避。バブル完全崩壊"
+        state = "🔴 【崩壊確定】OI消失・マクロ実需逃避。バブル完全崩壊"
     elif slope < 0 or (band_mean_far_spread < 15.0 and LIQUIDITY_WARNING):
         state = "🟠 【真空状態】流動性枯渇・スプレッド急縮小"
     elif band_mean_far_hr < 7.0:
         state = "🟡 【偽陽性】水準低下するもOI維持(ノイズ)"
     elif LIQUIDITY_WARNING or WHALE_WARNING:
-        state = "🟡 【流動性低下】価格維持するも実需建玉減少(警戒)"
+        state = "🟡 【流動性低下】価格維持するもマクロ実需建玉減少(警戒)"
     else:
-        state = "🟢 【正常】AIプレミアム＆実需OI(建玉) 堅調維持"
+        state = "🟢 【正常】AIプレミアム＆マクロ実需OI 堅調維持"
 
     return {
         "timestamp_jst": (datetime.now(timezone.utc) + timedelta(hours=9)).strftime('%Y-%m-%d %H:%M:%S'),
@@ -191,8 +185,8 @@ def calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, 
         "band_mean_spread": round(band_mean_far_spread, 2),
         "far_oi_total": pjm_far_oi_total,
         "far_vol_total": pjm_far_vol_total,
-        "cftc_whale_long": cftc_whale_long, # Phase 3: 実需のロング総量
-        "cftc_date": cftc_date,             # Phase 3: レポート日付
+        "cftc_whale_long": cftc_whale_long,
+        "cftc_date": cftc_date,
         "state": state,
         "curve_data": curve_data_map
     }
@@ -236,8 +230,8 @@ if __name__ == "__main__":
         print("[-] Fatal: Missing environment variables.")
         exit(1)
 
-    # Phase 3: CFTCデータ取得
-    cftc_whale_long, cftc_date = fetch_cftc_power_index()
+    # Phase 3: CFTCマクロプロキシデータ取得
+    cftc_whale_long, cftc_date = fetch_cftc_macro_proxy()
 
     # Phase 1&2: CMEデータ取得
     gas_curve, pjm_curve, ercot_curve = fetch_market_data_with_fallback()
