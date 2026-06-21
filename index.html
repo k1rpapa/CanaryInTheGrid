@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CanaryTerminal v4.0 Liquid Gravity UI</title>
+    <title>CanaryTerminal v4.0.1 Liquid Gravity UI (Volume Fix)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -18,7 +18,7 @@
     <nav class="bg-stone-950 border-b border-stone-800 text-stone-100 sticky top-0 z-50 shadow-md">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between h-auto sm:h-16 items-center py-3 sm:py-0">
             <div class="flex items-center mb-3 sm:mb-0">
-                <span class="text-sm font-black tracking-widest text-stone-100">🐦 CANARY TERMINAL v4.0</span>
+                <span class="text-sm font-black tracking-widest text-stone-100">🐦 CANARY TERMINAL v4.0.1</span>
                 <span class="text-[9px] bg-purple-500/20 text-purple-400 border border-purple-500/30 px-2 py-0.5 rounded-full ml-3 font-mono">LIQUID GRAVITY UI</span>
             </div>
             <div class="flex items-center space-x-2">
@@ -74,7 +74,7 @@
                 <div class="chart-container flex-grow"><canvas id="crossSectionChart"></canvas></div>
             </div>
 
-            <!-- Chart ④: Liquidity Tracker (OI & Volume) - NEW -->
+            <!-- Chart ④: Liquidity Tracker (OI & Volume) -->
             <div class="glass-panel p-4 rounded-2xl flex flex-col border-purple-900/30">
                 <div class="mb-3">
                     <span class="text-[9px] font-black text-purple-400 uppercase tracking-widest block">LIQUID GRAVITY TRACKER</span>
@@ -101,7 +101,7 @@
                 <div id="kpi-spread" class="text-2xl sm:text-3xl font-mono font-black text-cyan-400 mt-1">---</div>
                 <div class="text-xs text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Threshold: <span class="text-stone-300 font-bold">15.0%</span></div>
             </div>
-            <!-- KPI ④: Liquidity (OI & Volume) - NEW -->
+            <!-- KPI ④: Liquidity (OI & Volume) -->
             <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl relative overflow-hidden shadow-inner border-l-4 border-l-purple-500 flex flex-col justify-between">
                 <span class="text-[10px] text-purple-400 font-bold block tracking-wider">FAR OPEN INTEREST</span>
                 <div id="kpi-oi" class="text-2xl sm:text-3xl font-mono font-black text-purple-400 mt-1">---</div>
@@ -129,7 +129,6 @@
                     ticks: { color: '#78716c', font: { size: 9 }, maxRotation: 45, minRotation: 45, maxTicksLimit: 10 }
                 };
 
-                // Chart ①: Dual Line (Near vs Far HR)
                 this.hrChart = new Chart(document.getElementById('hrChart').getContext('2d'), {
                     type: 'line',
                     data: {
@@ -143,7 +142,6 @@
                     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#a8a29e', font: { size: 9 } } } }, scales: { x: commonXAxisOptions, y: { min: 5.5, max: 9.0, ticks: { color: '#a8a29e', font: { size: 10 } } } } }
                 });
 
-                // Chart ②: Dual Line Slope (Near vs Far Slope)
                 this.slopeChart = new Chart(document.getElementById('slopeChart').getContext('2d'), {
                     type: 'line',
                     data: {
@@ -157,7 +155,6 @@
                     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#a8a29e', font: { size: 9 } } } }, scales: { x: commonXAxisOptions, y: { min: -0.20, max: 0.20, ticks: { color: '#a8a29e', font: { size: 10 } } } } }
                 });
 
-                // Chart ③: 24 Months Full-Curve Profile
                 this.csChart = new Chart(document.getElementById('crossSectionChart').getContext('2d'), {
                     type: 'line',
                     data: {
@@ -170,7 +167,7 @@
                     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#a8a29e', font: { size: 10 } } } }, scales: { x: { ticks: { color: '#a8a29e', font: { size: 10 } } }, y: { min: 4.5, max: 9.5, ticks: { color: '#a8a29e', font: { size: 10 } } } } }
                 });
 
-                // Chart ④: Liquidity Tracker (OI & Volume) - NEW
+                // Chart ④: Liquidity Tracker (OI & Volume)
                 this.liqChart = new Chart(document.getElementById('liqChart').getContext('2d'), {
                     type: 'line',
                     data: {
@@ -185,8 +182,9 @@
                         plugins: { legend: { display: true, labels: { color: '#a8a29e', font: { size: 9 } } } }, 
                         scales: { 
                             x: commonXAxisOptions, 
-                            y: { type: 'linear', display: true, position: 'left', min: 0, ticks: { color: '#a8a29e', font: { size: 10 } }, grid: { color: 'rgba(120, 113, 108, 0.1)' } },
-                            y1: { type: 'linear', display: true, position: 'right', min: 0, ticks: { color: '#a8a29e', font: { size: 10 } }, grid: { drawOnChartArea: false } }
+                            y: { type: 'linear', display: true, position: 'left', min: 0, suggestedMax: 4000, ticks: { color: '#a8a29e', font: { size: 10 } }, grid: { color: 'rgba(120, 113, 108, 0.1)' } },
+                            // y1 (Volume) needs its own max calculation or logic to not squish when values are 0
+                            y1: { type: 'linear', display: true, position: 'right', min: 0, suggestedMax: 10, ticks: { color: '#a8a29e', font: { size: 10 } }, grid: { drawOnChartArea: false } }
                         } 
                     }
                 });
@@ -250,7 +248,7 @@
                             }
                         }
 
-                        // NEW: Parse far_oi_total and far_vol_total safely (handle old records gracefully)
+                        // Safely parse OI and Volume
                         const oi_total = f.far_oi_total ? parseInt(f.far_oi_total.integerValue || f.far_oi_total.doubleValue || 0) : 0;
                         const vol_total = f.far_vol_total ? parseInt(f.far_vol_total.integerValue || f.far_vol_total.doubleValue || 0) : 0;
 
@@ -290,10 +288,15 @@
                 this.slopeChart.data.datasets[2].data = Array(displayData.length).fill(0);
                 this.slopeChart.update();
 
-                // NEW: Update Liquidity Chart
+                // Update Liquidity Chart
+                const volumes = displayData.map(d => d.far_vol_total);
+                const maxVol = Math.max(...volumes, 10); // Ensure Y1 axis doesn't collapse to 1.0 when all 0s
+                
+                this.liqChart.options.scales.y1.max = Math.ceil(maxVol * 1.2); // Add 20% headroom
+                
                 this.liqChart.data.labels = labels;
                 this.liqChart.data.datasets[0].data = displayData.map(d => d.far_oi_total);
-                this.liqChart.data.datasets[1].data = displayData.map(d => d.far_vol_total);
+                this.liqChart.data.datasets[1].data = volumes;
                 this.liqChart.update();
                 
                 this.updateCrossSectionFromHistory(displayData.length - 1);
@@ -318,7 +321,7 @@
                 document.getElementById('kpi-spread').textContent = dayData.band_mean_spread.toFixed(1) + "%";
                 document.getElementById('kpi-spread').className = dayData.band_mean_spread > 15 ? "text-2xl sm:text-3xl font-mono font-black text-cyan-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
                 
-                // NEW: Update Liquidity KPIs
+                // Update Liquidity KPIs
                 document.getElementById('kpi-oi').textContent = dayData.far_oi_total.toLocaleString();
                 document.getElementById('kpi-vol').textContent = dayData.far_vol_total.toLocaleString();
                 document.getElementById('kpi-oi').className = dayData.far_oi_total > 500 ? "text-2xl sm:text-3xl font-mono font-black text-purple-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
@@ -364,7 +367,10 @@
                 this.slopeChart.data.labels = dummyDates; this.slopeChart.data.datasets[0].data = ts; this.slopeChart.data.datasets[1].data = tsNear; this.slopeChart.data.datasets[2].data = Array(60).fill(0); this.slopeChart.update();
                 this.csChart.data.datasets[0].data = pjmY; this.csChart.data.datasets[1].data = ercotY; this.csChart.update();
                 
-                // NEW: Simulate Liquidity
+                // Simulate Liquidity Chart
+                const maxVol = Math.max(...vol, 10);
+                this.liqChart.options.scales.y1.max = Math.ceil(maxVol * 1.2);
+                
                 this.liqChart.data.labels = dummyDates; this.liqChart.data.datasets[0].data = oi; this.liqChart.data.datasets[1].data = vol; this.liqChart.update();
 
                 document.getElementById('kpi-near-hr').textContent = hrNear[59].toFixed(2);
