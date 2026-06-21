@@ -9,7 +9,7 @@ from google.cloud import firestore
 from datetime import datetime, timezone, timedelta
 
 # =========================================================================
-# CanaryInTheGrid v4.6.1 - Phase 3: CFTC Macro Proxy (Endpoint Fix)
+# CanaryInTheGrid v5.1 - Phase 4: Execution Layer (LINE Messaging API)
 # =========================================================================
 
 ALL_MONTHS = list(range(0, 25))
@@ -36,25 +36,16 @@ def safe_int(value):
     return int(value)
 
 def fetch_cftc_macro_proxy():
-    """CFTC APIからマクロ・プロキシ（ヘンリーハブ天然ガス）の実需＆SDロングを取得"""
     print("[*] Infiltrating CFTC Socrata API for Macro Proxy (Henry Hub)...")
-    
-    # 修正: CFTC Disaggregated Futures Only Reportの正しいエンドポイントID (72hh-3qpy)
     url = "https://publicreporting.cftc.gov/resource/72hh-3qpy.json"
-    
-    # Henry Hub Natural Gas (NYMEX) のCFTCコントラクトコード
     macro_proxy_code = "023651" 
-    
     try:
-        # 最新のレポートを1件だけ取得
         query = f"{url}?cftc_contract_market_code={macro_proxy_code}&$order=report_date_as_yyyy_mm_dd DESC&$limit=1"
         response = requests.get(query, timeout=10)
         
         if response.status_code == 200 and len(response.json()) > 0:
             data = response.json()[0]
             report_date = data.get("report_date_as_yyyy_mm_dd", "N/A")[:10]
-            
-            # 天然ガス市場における実需(Producer/Merchant)とSwap Dealersの買いポジション(ロング)を合算
             pm_long = float(data.get("prod_merc_positions_long", 0))
             sd_long = float(data.get("swap_positions_long", 0))
             whale_long_total = pm_long + sd_long
@@ -63,7 +54,6 @@ def fetch_cftc_macro_proxy():
             return whale_long_total, report_date
         else:
             raise Exception(f"API returned empty data or status code {response.status_code}.")
-            
     except Exception as e:
         print(f"[!] CFTC Fetch Error: {e}. Engaging simulated ledger.")
         return 12500, "Simulated"
@@ -76,13 +66,11 @@ def fetch_cme_curve(product_id, default_start_price, default_step):
         "Accept": "application/json, text/plain, */*",
         "Referer": "https://www.cmegroup.com/"
     }
-    
     curve = {}
     try:
         response = fetch_with_backoff(cme_url, headers=headers)
         data = response.json()
         if len(data) < 25: raise Exception(f"Insufficient liquidity ({len(data)} months).")
-            
         for idx, m in enumerate(ALL_MONTHS):
             month_data = data[idx]
             price = float(month_data.get('last', 0)) or float(month_data.get('priorSettle', 0))
@@ -102,7 +90,6 @@ def generate_regional_power_curves(gas_curve):
         pjm_base_hr = 7.6 + ((m - 12) * 0.05) if m >= 12 else 7.3 + (m * 0.02)
         ercot_base_hr = 6.2 + ((m - 12) * 0.02) if m >= 12 else 6.0 + (m * 0.01)
         dummy_oi = max(0, 500 - (m * 15)) 
-        
         pjm_curve[m] = {'price': round(gas_curve[m]['price'] * pjm_base_hr, 2), 'volume': 0, 'oi': dummy_oi}
         ercot_curve[m] = {'price': round(gas_curve[m]['price'] * ercot_base_hr, 2), 'volume': 0, 'oi': dummy_oi}
     return pjm_curve, ercot_curve
@@ -118,12 +105,10 @@ def fetch_market_data_with_fallback():
     if not pjm_curve or not ercot_curve:
         print("[!] Tactical Fallback (Modeling) engaged.")
         pjm_curve, ercot_curve = generate_regional_power_curves(gas_curve)
-        
     return gas_curve, pjm_curve, ercot_curve
 
 def calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, cftc_date):
     print("[*] Calculating Phase 1-3 Unified Metrics...")
-    
     pjm_all_hrs, ercot_all_hrs, spreads = [], [], []
     curve_data_map = {}
     pjm_far_oi_total = 0
@@ -142,7 +127,6 @@ def calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, 
         
         pjm_all_hrs.append(hr_pjm)
         ercot_all_hrs.append(hr_ercot)
-        
         spread_pct = ((hr_pjm - hr_ercot) / hr_ercot) * 100 if hr_ercot > 0 else 0
         spreads.append(spread_pct)
         
@@ -191,15 +175,70 @@ def calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, 
         "curve_data": curve_data_map
     }
 
+# =========================================================================
+# 🚨 Phase 4: Tactical Alert Module (Discord & LINE Messaging API)
+# =========================================================================
+def dispatch_alert(metrics, discord_url, line_channel_token, line_user_id):
+    state = metrics['state']
+    
+    # 🔴崩壊 と 🟠真空 の場合のみアラート発動
+    if "🔴" not in state and "🟠" not in state:
+        print("[*] Market Stable. No tactical alert dispatched.")
+        return
+
+    print("🚨 [CRITICAL] TRIGGERING TACTICAL ALERT! 🚨")
+    
+    message = f"""
+🚨 **CANARY TERMINAL ALERT** 🚨
+**STATUS:** {state}
+
+📊 **MARKET METRICS:**
+* **PJM Far HR (12-24M):** {metrics['band_mean_hr']}
+* **Premium Spread:** {metrics['band_mean_spread']}%
+* **Curve Slope:** {metrics['slope']}
+* **PJM Far OI (Liquidity):** {metrics['far_oi_total']}
+* **CFTC Whale Long:** {metrics['cftc_whale_long']} ({metrics['cftc_date']})
+"""
+
+    # 1. Dispatch to Discord
+    if discord_url:
+        try:
+            res = requests.post(discord_url, json={"content": message})
+            if res.status_code in [200, 204]: print("[+] Discord Alert Sent.")
+        except Exception as e: print(f"[-] Discord Alert Failed: {e}")
+
+    # 2. Dispatch to LINE Messaging API
+    if line_channel_token and line_user_id:
+        try:
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {line_channel_token}"
+            }
+            data = {
+                "to": line_user_id,
+                "messages": [
+                    {
+                        "type": "text",
+                        "text": message
+                    }
+                ]
+            }
+            res = requests.post("https://api.line.me/v2/bot/message/push", headers=headers, json=data)
+            if res.status_code == 200: 
+                print("[+] LINE Messaging API Alert Sent.")
+            else:
+                print(f"[-] LINE Alert Failed: {res.status_code} - {res.text}")
+        except Exception as e: print(f"[-] LINE Alert Exception: {e}")
+
+# =========================================================================
+
 def log_to_google_sheets(metrics, credentials_json_str, sheet_id):
-    print("[*] Logging to Google Sheets...")
     try:
         credentials_info = json.loads(credentials_json_str)
         scopes = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
         credentials = Credentials.from_service_account_info(credentials_info, scopes=scopes)
         gc = gspread.authorize(credentials)
         worksheet = gc.open_by_key(sheet_id).sheet1
-        
         row_data = [
             metrics["timestamp_jst"], metrics["band_mean_hr"], metrics["slope"],
             metrics["band_mean_spread"], metrics["band_mean_near_hr"], 
@@ -207,27 +246,28 @@ def log_to_google_sheets(metrics, credentials_json_str, sheet_id):
             metrics["cftc_whale_long"], metrics["state"]
         ]
         worksheet.append_row(row_data)
-        print("[+] Google Sheets sync complete.")
     except Exception as e: print(f"[-] Sheets Logging Error: {e}")
 
 def log_to_cloud_firestore(metrics, credentials_json_str):
-    print("[*] Logging to Cloud Firestore...")
     try:
         credentials_info = json.loads(credentials_json_str)
         credentials = Credentials.from_service_account_info(credentials_info)
         db = firestore.Client(credentials=credentials, project=credentials_info['project_id'])
-        
         doc_id = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
         db.collection("canary_logs").document(doc_id).set(metrics)
-        print(f"[+] Firestore sync complete. DocID: {doc_id}")
     except Exception as e: print(f"[-] Firestore Logging Error: {e}")
 
 if __name__ == "__main__":
     GCP_SHEET_ID = os.getenv("GCP_SHEET_ID")
     GCP_SERVICE_ACCOUNT_JSON = os.getenv("GCP_SERVICE_ACCOUNT_JSON")
+    DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL") 
+    
+    # Phase 4: LINE Messaging API variables
+    LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
+    LINE_USER_ID = os.getenv("LINE_USER_ID")
     
     if not GCP_SHEET_ID or not GCP_SERVICE_ACCOUNT_JSON:
-        print("[-] Fatal: Missing environment variables.")
+        print("[-] Fatal: Missing GCP environment variables.")
         exit(1)
 
     cftc_whale_long, cftc_date = fetch_cftc_macro_proxy()
@@ -235,6 +275,10 @@ if __name__ == "__main__":
     
     metrics = calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, cftc_date)
     
+    # Execution Layer: Alert Check
+    dispatch_alert(metrics, DISCORD_WEBHOOK_URL, LINE_CHANNEL_ACCESS_TOKEN, LINE_USER_ID)
+    
+    # Data Layer: Logging
     log_to_google_sheets(metrics, GCP_SERVICE_ACCOUNT_JSON, GCP_SHEET_ID)
     log_to_cloud_firestore(metrics, GCP_SERVICE_ACCOUNT_JSON)
     
