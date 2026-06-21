@@ -2,8 +2,7 @@ name: CanaryInTheGrid v3.6 Live Monitor
 
 on:
   schedule:
-    - cron: '0 21 * * *'  # 毎朝JST 6:00 (UTC 21:00) にバッチ実行
-  workflow_dispatch:      # GitHub画面からの手動実行ボタン
+    - cron: '0 21 * * 1-5'  # 月〜金 UTC 21:00 (火〜土 JST 6:00) に限定実行
 
 jobs:
   execute-canary:
