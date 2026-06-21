@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CanaryTerminal v4.5 Whale Ledger UI</title>
+    <title>CanaryTerminal v4.5.1 Whale Ledger UI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -14,10 +14,11 @@
 </head>
 <body class="min-h-screen flex flex-col antialiased">
 
+    <!-- Global Navigation -->
     <nav class="bg-stone-950 border-b border-stone-800 text-stone-100 sticky top-0 z-50 shadow-md">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between h-auto sm:h-16 items-center py-3 sm:py-0">
             <div class="flex items-center mb-3 sm:mb-0">
-                <span class="text-sm font-black tracking-widest text-stone-100">🐦 CANARY TERMINAL v4.5</span>
+                <span class="text-sm font-black tracking-widest text-stone-100">🐦 CANARY TERMINAL v4.5.1</span>
                 <span class="text-[9px] bg-fuchsia-500/20 text-fuchsia-400 border border-fuchsia-500/30 px-2 py-0.5 rounded-full ml-3 font-mono">WHALE LEDGER UI</span>
             </div>
             <div class="flex items-center space-x-2">
@@ -29,12 +30,14 @@
 
     <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
         
+        <!-- Tactical Advisory -->
         <div class="bg-stone-900/80 border-2 border-stone-700 p-5 rounded-2xl mb-6 shadow-2xl relative overflow-hidden">
             <div id="status-accent" class="absolute top-0 left-0 w-2 h-full bg-stone-500 transition-colors duration-500"></div>
             <span class="text-[10px] font-black text-stone-500 uppercase tracking-widest block mb-1 ml-3">TACTICAL ADVISORY (サマリー)</span>
             <div id="kpi-status" class="text-lg sm:text-xl font-bold text-stone-200 ml-3 leading-relaxed transition-colors duration-500">データをロードしてください。</div>
         </div>
 
+        <!-- Controller -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
             <button onclick="app.useSimulation('normal')" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-emerald-400 border-l-4 border-l-emerald-500 hover:bg-stone-800 transition-colors">🟢 正常: プレミアム維持</button>
             <button onclick="app.useSimulation('noise')" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-amber-400 border-l-4 border-l-amber-500 hover:bg-stone-800 transition-colors">🟡 警戒: 実需建玉減少</button>
@@ -42,7 +45,9 @@
             <button onclick="app.useSimulation('collapse')" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-rose-400 border-l-4 border-l-rose-500 hover:bg-stone-800 transition-colors">🔴 崩壊: 実需逃避・逆サヤ</button>
         </div>
 
+        <!-- Visual Radar (5 Charts Layout: 3 Top, 2 Bottom) -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <!-- 上段: 金融市場の現在地 (Price & Spread) -->
             <div class="glass-panel p-4 rounded-2xl flex flex-col">
                 <div class="mb-3">
                     <span class="text-[9px] font-black text-stone-500 uppercase tracking-widest block">ABSOLUTE LEVEL TRACKER</span>
@@ -67,6 +72,7 @@
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- 下段: 質量と深淵 (Liquidity & CFTC) -->
             <div class="glass-panel p-4 rounded-2xl flex flex-col border-purple-900/30">
                 <div class="mb-3">
                     <span class="text-[9px] font-black text-purple-400 uppercase tracking-widest block">LIQUID GRAVITY TRACKER</span>
@@ -75,6 +81,7 @@
                 <div class="chart-container flex-grow"><canvas id="liqChart"></canvas></div>
             </div>
             
+            <!-- Chart ⑤: CFTC Whale Ledger -->
             <div class="glass-panel p-4 rounded-2xl flex flex-col border-fuchsia-900/30">
                 <div class="mb-3">
                     <span class="text-[9px] font-black text-fuchsia-400 uppercase tracking-widest block">CFTC WHALE LEDGER (PHASE 3)</span>
@@ -84,6 +91,7 @@
             </div>
         </div>
 
+        <!-- Tactical KPI Board (5 Panels) -->
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-4" id="kpi-board">
             <div class="bg-stone-950 border border-stone-700 p-4 rounded-xl shadow-inner border-l-4 border-l-cyan-500 flex flex-col justify-between">
                 <span class="text-[10px] text-cyan-400 font-bold block tracking-wider">FAR PJM HR</span>
@@ -105,10 +113,11 @@
                 <div id="kpi-oi" class="text-2xl sm:text-3xl font-mono font-black text-purple-400 mt-1">---</div>
                 <div class="text-xs text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Volume: <span id="kpi-vol" class="text-stone-300 font-bold">---</span></div>
             </div>
+            <!-- KPI ⑤: CFTC WHALES -->
             <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl shadow-inner border-l-4 border-l-fuchsia-500 flex flex-col justify-between lg:col-span-1 col-span-2">
                 <span class="text-[10px] text-fuchsia-400 font-bold block tracking-wider">CFTC WHALE LONG</span>
                 <div id="kpi-cftc" class="text-2xl sm:text-3xl font-mono font-black text-fuchsia-400 mt-1">---</div>
-                <div class="text-xs text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Date: <span id="kpi-cftc-date" class="text-stone-300 font-bold font-sans">---</span></div>
+                <div class="text-xs text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Report Date: <span id="kpi-cftc-date" class="text-stone-300 font-bold font-sans">---</span></div>
             </div>
         </div>
     </main>
@@ -165,7 +174,6 @@
                     } }
                 });
 
-                // Chart ⑤: CFTC Whale Chart - NEW
                 this.cftcChart = new Chart(document.getElementById('cftcChart').getContext('2d'), {
                     type: 'line', data: { labels: [], datasets: [
                         { label: '実需＆SD ロング総量', data: [], borderColor: '#d946ef', backgroundColor: 'rgba(217, 70, 239, 0.15)', borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3 }
@@ -293,7 +301,8 @@
 
                 // Update CFTC KPIs
                 document.getElementById('kpi-cftc').textContent = dayData.cftc_whale_long > 0 ? dayData.cftc_whale_long.toLocaleString() : "---";
-                document.getElementById('kpi-cftc-date').textContent = dayData.cftc_date || "N/A";
+                // Fixed: Make it clear it's the report date, not a simulation artifact when real data is loaded
+                document.getElementById('kpi-cftc-date').textContent = dayData.cftc_date !== "Simulated" ? dayData.cftc_date : "N/A (Wait for update)";
                 document.getElementById('kpi-cftc').className = dayData.cftc_whale_long > 5000 ? "text-2xl sm:text-3xl font-mono font-black text-fuchsia-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
 
                 const adv = document.getElementById('kpi-status');
@@ -335,7 +344,6 @@
                 this.liqChart.options.scales.y1.max = Math.ceil(Math.max(...vol, 10) * 1.2);
                 this.liqChart.data.labels = dummyDates; this.liqChart.data.datasets[0].data = oi; this.liqChart.data.datasets[1].data = vol; this.liqChart.update();
                 
-                // Simulate CFTC Chart
                 this.cftcChart.data.labels = dummyDates; this.cftcChart.data.datasets[0].data = cftc; this.cftcChart.update();
 
                 document.getElementById('kpi-near-hr').textContent = hrNear[59].toFixed(2);
@@ -348,8 +356,8 @@
                 document.getElementById('kpi-vol').textContent = Math.floor(vol[59]).toLocaleString();
                 document.getElementById('kpi-oi').className = oi[59] > 500 ? "text-2xl sm:text-3xl font-mono font-black text-purple-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
                 
-                // Simulate CFTC KPIs
                 document.getElementById('kpi-cftc').textContent = Math.floor(cftc[59]).toLocaleString();
+                // In simulation mode, display "Simulated" to make it clear this isn't real data
                 document.getElementById('kpi-cftc-date').textContent = "Simulated";
                 document.getElementById('kpi-cftc').className = cftc[59] > 5000 ? "text-2xl sm:text-3xl font-mono font-black text-fuchsia-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
 
