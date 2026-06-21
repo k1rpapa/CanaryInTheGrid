@@ -4,13 +4,13 @@ import time
 import requests
 import gspread
 import statistics
-import sys # sysモジュールを追加 (強制終了用)
+import sys
 from google.oauth2.service_account import Credentials
 from google.cloud import firestore
 from datetime import datetime, timezone, timedelta
 
 # =========================================================================
-# CanaryInTheGrid v5.2 - Phase 4: Alert Debug Mode (Hard Fail)
+# CanaryInTheGrid v5.2 - Phase 4: Production Ready (Alert with Dashboard URL)
 # =========================================================================
 
 ALL_MONTHS = list(range(0, 25))
@@ -177,15 +177,15 @@ def calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, 
     }
 
 # =========================================================================
-# 🚨 Phase 4: Tactical Alert Module (Debug Mode)
+# 🚨 Phase 4: Tactical Alert Module (Production Mode)
 # =========================================================================
 def dispatch_alert(metrics, discord_url, line_channel_token, line_user_id):
     state = metrics['state']
     
-    # 🔴崩壊 と 🟠真空 の場合のみアラート発動 (テスト時はこれをコメントアウト)
-    # if "🔴" not in state and "🟠" not in state:
-    #     print("[*] Market Stable. No tactical alert dispatched.")
-    #     return
+    # 🔴崩壊 と 🟠真空 の場合のみアラート発動 (本番稼働用にアクティブ化)
+    if "🔴" not in state and "🟠" not in state:
+        print("[*] Market Stable. No tactical alert dispatched.")
+        return
 
     print("🚨 [CRITICAL] TRIGGERING TACTICAL ALERT! 🚨")
     
@@ -199,6 +199,9 @@ def dispatch_alert(metrics, discord_url, line_channel_token, line_user_id):
 * **Curve Slope:** {metrics['slope']}
 * **PJM Far OI (Liquidity):** {metrics['far_oi_total']}
 * **CFTC Whale Long:** {metrics['cftc_whale_long']} ({metrics['cftc_date']})
+
+🔗 **DASHBOARD:**
+https://k1rpapa.github.io/CanaryInTheGrid/
 """
 
     if discord_url:
@@ -213,10 +216,10 @@ def dispatch_alert(metrics, discord_url, line_channel_token, line_user_id):
         try:
             headers = {
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {line_channel_token.strip()}" # 空白除去の保険
+                "Authorization": f"Bearer {line_channel_token.strip()}"
             }
             data = {
-                "to": line_user_id.strip(), # 空白除去の保険
+                "to": line_user_id.strip(),
                 "messages": [{"type": "text", "text": message}]
             }
             res = requests.post("https://api.line.me/v2/bot/message/push", headers=headers, json=data)
@@ -224,10 +227,9 @@ def dispatch_alert(metrics, discord_url, line_channel_token, line_user_id):
             if res.status_code == 200: 
                 print("[+] LINE Messaging API Alert Sent Successfully.")
             else:
-                # HTTPステータスが200以外なら、詳細をログに出して強制クラッシュさせる
                 error_msg = f"[-] LINE Alert Failed! Status: {res.status_code}, Response: {res.text}"
                 print(error_msg)
-                sys.exit(error_msg) # ここでスクリプトを止める
+                sys.exit(error_msg)
                 
         except Exception as e: 
             print(f"[-] LINE Alert Exception: {e}")
@@ -279,7 +281,6 @@ if __name__ == "__main__":
     
     metrics = calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, cftc_date)
     
-    # 💥 テスト発射（エラーがあればここで Actions が赤くなる）
     dispatch_alert(metrics, DISCORD_WEBHOOK_URL, LINE_CHANNEL_ACCESS_TOKEN, LINE_USER_ID)
     
     log_to_google_sheets(metrics, GCP_SERVICE_ACCOUNT_JSON, GCP_SHEET_ID)
