@@ -5,12 +5,14 @@ import requests
 import gspread
 import statistics
 import sys
+# cloudscraperのインポートを追加 (要 pip install cloudscraper)
+import cloudscraper
 from google.oauth2.service_account import Credentials
 from google.cloud import firestore
 from datetime import datetime, timezone, timedelta
 
 # =========================================================================
-# CanaryInTheGrid v5.2 - Phase 4: Production Ready (Alert with Dashboard URL)
+# CanaryInTheGrid v5.3 - Phase 1&2: Cloudflare Bypass (Cloudscraper)
 # =========================================================================
 
 ALL_MONTHS = list(range(0, 25))
@@ -18,15 +20,24 @@ FAR_MONTHS = list(range(12, 25))
 
 def fetch_with_backoff(url, headers=None, max_retries=5):
     delay = 1
+    # requests の代わりに cloudscraper インスタンスを生成
+    scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'mobile': False})
+    
     for attempt in range(max_retries):
         try:
-            response = requests.get(url, headers=headers, timeout=10)
+            # scraper.get を使用してCloudflareのボット検知を突破
+            response = scraper.get(url, headers=headers, timeout=15)
             response.raise_for_status()
             return response
-        except (requests.RequestException, Exception) as e:
+        except Exception as e:
             if attempt == max_retries - 1:
-                print(f"[-] Fatal: API Request failed: {e}")
+                print(f"[-] Fatal: API Request failed after {max_retries} attempts: {e}")
+                # HTTPステータスコードが取得できれば表示
+                if hasattr(e, 'response') and e.response is not None:
+                     print(f"[-] Response Status: {e.response.status_code}")
+                     print(f"[-] Response Text (first 200 chars): {e.response.text[:200]}")
                 raise e
+            print(f"[*] Retry {attempt + 1}/{max_retries} due to {e}. Waiting {delay}s...")
             time.sleep(delay)
             delay *= 2
 
@@ -42,7 +53,7 @@ def fetch_cftc_macro_proxy():
     macro_proxy_code = "023651" 
     try:
         query = f"{url}?cftc_contract_market_code={macro_proxy_code}&$order=report_date_as_yyyy_mm_dd DESC&$limit=1"
-        response = requests.get(query, timeout=10)
+        response = requests.get(query, timeout=10) # CFTCは通常のrequestsでOK
         
         if response.status_code == 200 and len(response.json()) > 0:
             data = response.json()[0]
@@ -63,8 +74,10 @@ def fetch_cme_curve(product_id, default_start_price, default_step):
     print(f"[*] Extracting Price, Volume & OI from Product ID: {product_id}...")
     cme_url = f"https://www.cmegroup.com/CmeWS/mvc/Quotes/Future/{product_id}/G"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        # ユーザーエージェントなどを本物のブラウザに偽装
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
         "Referer": "https://www.cmegroup.com/"
     }
     curve = {}
@@ -80,6 +93,7 @@ def fetch_cme_curve(product_id, default_start_price, default_step):
                 'volume': safe_int(month_data.get('volume', 0)),
                 'oi': safe_int(month_data.get('openInterest', 0))
             }
+        print(f"[+] CME Extraction Successful for Product ID: {product_id}")
         return curve
     except Exception as e:
         print(f"[-] CME Extraction Error for {product_id}: {e}")
@@ -96,19 +110,25 @@ def generate_regional_power_curves(gas_curve):
     return pjm_curve, ercot_curve
 
 def fetch_market_data_with_fallback():
+    # データ取得の成否フラグ
+    fallback_engaged = False
+    
     gas_curve = fetch_cme_curve("425", 2.50, 0.02)
     if not gas_curve:
+        fallback_engaged = True
         gas_curve = {m: {'price': 2.50 + (m * 0.02), 'volume': 0, 'oi': 0} for m in ALL_MONTHS}
         
     pjm_curve = fetch_cme_curve("324", 45.0, 0.5)
     ercot_curve = fetch_cme_curve("838", 35.0, 0.2)
     
     if not pjm_curve or not ercot_curve:
-        print("[!] Tactical Fallback (Modeling) engaged.")
+        fallback_engaged = True
+        print("[!] Tactical Fallback (Modeling) engaged. Failed to bypass CME WAF.")
         pjm_curve, ercot_curve = generate_regional_power_curves(gas_curve)
-    return gas_curve, pjm_curve, ercot_curve
+    
+    return gas_curve, pjm_curve, ercot_curve, fallback_engaged
 
-def calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, cftc_date):
+def calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, cftc_date, fallback_engaged):
     print("[*] Calculating Phase 1-3 Unified Metrics...")
     pjm_all_hrs, ercot_all_hrs, spreads = [], [], []
     curve_data_map = {}
@@ -151,7 +171,10 @@ def calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, 
     LIQUIDITY_WARNING = pjm_far_oi_total < 500
     WHALE_WARNING = cftc_whale_long < 100000 
     
-    if band_mean_far_hr < 7.0 and slope < 0 and LIQUIDITY_WARNING and WHALE_WARNING:
+    # フォールバック発動時は状態を明示
+    if fallback_engaged:
+        state = "⚠️ 【CME DATA BLOCKED】 取得失敗・シミュレーション値表示"
+    elif band_mean_far_hr < 7.0 and slope < 0 and LIQUIDITY_WARNING and WHALE_WARNING:
         state = "🔴 【崩壊確定】OI消失・マクロ実需逃避。バブル完全崩壊"
     elif slope < 0 or (band_mean_far_spread < 15.0 and LIQUIDITY_WARNING):
         state = "🟠 【真空状態】流動性枯渇・スプレッド急縮小"
@@ -176,15 +199,12 @@ def calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, 
         "curve_data": curve_data_map
     }
 
-# =========================================================================
-# 🚨 Phase 4: Tactical Alert Module (Production Mode)
-# =========================================================================
 def dispatch_alert(metrics, discord_url, line_channel_token, line_user_id):
     state = metrics['state']
     
-    # 🔴崩壊 と 🟠真空 の場合のみアラート発動 (本番稼働用にアクティブ化)
-    if "🔴" not in state and "🟠" not in state:
-        print("[*] Market Stable. No tactical alert dispatched.")
+    # 🔴, 🟠 または ⚠️ (ブロック時) にアラート発動
+    if "🔴" not in state and "🟠" not in state and "⚠️" not in state:
+        print(f"[*] Market Stable ({state}). No tactical alert dispatched.")
         return
 
     print("🚨 [CRITICAL] TRIGGERING TACTICAL ALERT! 🚨")
@@ -237,8 +257,6 @@ https://k1rpapa.github.io/CanaryInTheGrid/
     else:
         print("[-] LINE credentials not found. Skipping LINE alert.")
 
-# =========================================================================
-
 def log_to_google_sheets(metrics, credentials_json_str, sheet_id):
     try:
         credentials_info = json.loads(credentials_json_str)
@@ -277,9 +295,10 @@ if __name__ == "__main__":
         sys.exit(1)
 
     cftc_whale_long, cftc_date = fetch_cftc_macro_proxy()
-    gas_curve, pjm_curve, ercot_curve = fetch_market_data_with_fallback()
+    # 変更: fallback_engaged フラグを受け取る
+    gas_curve, pjm_curve, ercot_curve, fallback_engaged = fetch_market_data_with_fallback()
     
-    metrics = calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, cftc_date)
+    metrics = calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, cftc_date, fallback_engaged)
     
     dispatch_alert(metrics, DISCORD_WEBHOOK_URL, LINE_CHANNEL_ACCESS_TOKEN, LINE_USER_ID)
     
