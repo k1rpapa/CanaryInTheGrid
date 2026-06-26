@@ -2,369 +2,64 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CanaryTerminal v4.6 Macro Proxy UI</title>
+    <title>AI Infrastructure Canary Terminal v9.5</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body { font-family: 'SF Pro Display', Arial, sans-serif; background-color: #0c0a09; color: #f5f5f4; }
-        .chart-container { position: relative; width: 100%; height: 30vh; min-height: 220px; }
-        .glass-panel { background-color: rgba(28, 25, 23, 0.8); border: 1px solid rgba(120, 113, 108, 0.3); backdrop-filter: blur(10px); }
-    </style>
 </head>
-<body class="min-h-screen flex flex-col antialiased">
+<body class="bg-stone-950 text-stone-200 p-8">
+    <header class="mb-8">
+        <h1 class="text-3xl font-black text-white">PHYSICAL INFRASTRUCTURE CANARY v9.5</h1>
+        <p class="text-stone-500 font-mono text-sm">Three-Tiered Divergence Monitoring (Foundation -> Fabric -> Velocity)</p>
+    </header>
 
-    <!-- Global Navigation -->
-    <nav class="bg-stone-950 border-b border-stone-800 text-stone-100 sticky top-0 z-50 shadow-md">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between h-auto sm:h-16 items-center py-3 sm:py-0">
-            <div class="flex items-center mb-3 sm:mb-0">
-                <span class="text-sm font-black tracking-widest text-stone-100">🐦 CANARY TERMINAL v4.6</span>
-                <span class="text-[9px] bg-fuchsia-500/20 text-fuchsia-400 border border-fuchsia-500/30 px-2 py-0.5 rounded-full ml-3 font-mono">MACRO PROXY UI</span>
-            </div>
-            <div class="flex items-center space-x-2">
-                <input type="text" id="gcp-project-id" placeholder="GCPプロジェクトID" class="bg-stone-900 border border-stone-800 text-xs text-stone-200 px-3 py-1.5 rounded-lg font-mono">
-                <button onclick="app.loadLiveDatabase()" class="bg-cyan-600 hover:bg-cyan-500 text-stone-950 text-xs font-black px-4 py-1.5 rounded-lg transition-all shadow-md hover:shadow-cyan-500/20">📡 実戦データ同期</button>
-            </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="dashboard">
+        <!-- Tier 1 -->
+        <div class="bg-stone-900 p-6 rounded-2xl border border-stone-800">
+            <h2 class="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-4">Tier 1: Foundation (Physical)</h2>
+            <div id="t1-list" class="space-y-3"></div>
         </div>
-    </nav>
-
-    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
-        
-        <!-- Tactical Advisory -->
-        <div class="bg-stone-900/80 border-2 border-stone-700 p-5 rounded-2xl mb-6 shadow-2xl relative overflow-hidden">
-            <div id="status-accent" class="absolute top-0 left-0 w-2 h-full bg-stone-500 transition-colors duration-500"></div>
-            <span class="text-[10px] font-black text-stone-500 uppercase tracking-widest block mb-1 ml-3">TACTICAL ADVISORY (サマリー)</span>
-            <div id="kpi-status" class="text-lg sm:text-xl font-bold text-stone-200 ml-3 leading-relaxed transition-colors duration-500">データをロードしてください。</div>
+        <!-- Tier 1.5 -->
+        <div class="bg-stone-900 p-6 rounded-2xl border border-stone-800">
+            <h2 class="text-xs font-bold text-amber-400 uppercase tracking-widest mb-4">Tier 1.5: Compute & Fabric</h2>
+            <div id="t15-list" class="space-y-3"></div>
         </div>
-
-        <!-- Controller -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-            <button onclick="app.useSimulation('normal')" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-emerald-400 border-l-4 border-l-emerald-500 hover:bg-stone-800 transition-colors">🟢 正常: プレミアム維持</button>
-            <button onclick="app.useSimulation('noise')" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-amber-400 border-l-4 border-l-amber-500 hover:bg-stone-800 transition-colors">🟡 警戒: 実需建玉減少</button>
-            <button onclick="app.useSimulation('vacuum')" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-orange-400 border-l-4 border-l-orange-500 hover:bg-stone-800 transition-colors">🟠 真空: OI枯渇・急縮小</button>
-            <button onclick="app.useSimulation('collapse')" class="p-3 bg-stone-900/50 border border-stone-800 rounded-xl font-bold text-xs text-rose-400 border-l-4 border-l-rose-500 hover:bg-stone-800 transition-colors">🔴 崩壊: マクロ実需逃避</button>
+        <!-- Tier 2 -->
+        <div class="bg-stone-900 p-6 rounded-2xl border border-stone-800">
+            <h2 class="text-xs font-bold text-fuchsia-400 uppercase tracking-widest mb-4">Tier 2: Velocity (Operations)</h2>
+            <div id="t2-list" class="space-y-3"></div>
         </div>
-
-        <!-- Visual Radar (5 Charts Layout: 3 Top, 2 Bottom) -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            <div class="glass-panel p-4 rounded-2xl flex flex-col">
-                <div class="mb-3">
-                    <span class="text-[9px] font-black text-stone-500 uppercase tracking-widest block">ABSOLUTE LEVEL TRACKER</span>
-                    <h3 class="text-xs font-bold text-stone-200">① バンド平均ヒートレート推移</h3>
-                </div>
-                <div class="chart-container flex-grow"><canvas id="hrChart"></canvas></div>
-            </div>
-            <div class="glass-panel p-4 rounded-2xl flex flex-col">
-                <div class="mb-3">
-                    <span class="text-[9px] font-black text-stone-500 uppercase tracking-widest block">MACRO DECAY TRACKER</span>
-                    <h3 class="text-xs font-bold text-stone-200">② カーボスロープ推移 (傾きm)</h3>
-                </div>
-                <div class="chart-container flex-grow"><canvas id="slopeChart"></canvas></div>
-            </div>
-            <div class="glass-panel p-4 rounded-2xl flex flex-col">
-                <div class="mb-3">
-                    <span class="text-[9px] font-black text-stone-500 uppercase tracking-widest block">SPATIAL SPREAD PROFILER</span>
-                    <h3 class="text-xs font-bold text-stone-200">③ PJM vs ERCOT フルカーブ断面</h3>
-                </div>
-                <div class="chart-container flex-grow"><canvas id="crossSectionChart"></canvas></div>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <div class="glass-panel p-4 rounded-2xl flex flex-col border-purple-900/30">
-                <div class="mb-3">
-                    <span class="text-[9px] font-black text-purple-400 uppercase tracking-widest block">LIQUID GRAVITY TRACKER</span>
-                    <h3 class="text-xs font-bold text-stone-200">④ 遠月(12-24M) 建玉・出来高推移</h3>
-                </div>
-                <div class="chart-container flex-grow"><canvas id="liqChart"></canvas></div>
-            </div>
-            
-            <div class="glass-panel p-4 rounded-2xl flex flex-col border-fuchsia-900/30">
-                <div class="mb-3">
-                    <span class="text-[9px] font-black text-fuchsia-400 uppercase tracking-widest block">CFTC MACRO PROXY (PHASE 3)</span>
-                    <h3 class="text-xs font-bold text-stone-200">⑤ マクロ実需(天然ガス) ロングポジション総量</h3>
-                </div>
-                <div class="chart-container flex-grow"><canvas id="cftcChart"></canvas></div>
-            </div>
-        </div>
-
-        <!-- Tactical KPI Board (5 Panels) -->
-        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4" id="kpi-board">
-            <div class="bg-stone-950 border border-stone-700 p-4 rounded-xl shadow-inner border-l-4 border-l-cyan-500 flex flex-col justify-between">
-                <span class="text-[10px] text-cyan-400 font-bold block tracking-wider">FAR PJM HR</span>
-                <div id="kpi-hr" class="text-2xl sm:text-3xl font-mono font-black text-stone-100 mt-1">---</div>
-                <div class="text-xs text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Near: <span id="kpi-near-hr" class="text-stone-300 font-bold">---</span></div>
-            </div>
-            <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl shadow-inner border-l-4 border-l-amber-500 flex flex-col justify-between">
-                <span class="text-[10px] text-amber-500 font-bold block tracking-wider">FAR SLOPE (m)</span>
-                <div id="kpi-slope" class="text-2xl sm:text-3xl font-mono font-black text-amber-400 mt-1">---</div>
-                <div class="text-xs text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Near: <span id="kpi-near-slope" class="text-stone-300 font-bold">---</span></div>
-            </div>
-            <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl shadow-inner border-l-4 border-l-cyan-500 flex flex-col justify-between">
-                <span class="text-[10px] text-stone-500 font-bold block tracking-wider">PREMIUM SPREAD</span>
-                <div id="kpi-spread" class="text-2xl sm:text-3xl font-mono font-black text-cyan-400 mt-1">---</div>
-                <div class="text-xs text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Threshold: <span class="text-stone-300 font-bold">15.0%</span></div>
-            </div>
-            <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl shadow-inner border-l-4 border-l-purple-500 flex flex-col justify-between">
-                <span class="text-[10px] text-purple-400 font-bold block tracking-wider">FAR OPEN INTEREST</span>
-                <div id="kpi-oi" class="text-2xl sm:text-3xl font-mono font-black text-purple-400 mt-1">---</div>
-                <div class="text-xs text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Volume: <span id="kpi-vol" class="text-stone-300 font-bold">---</span></div>
-            </div>
-            <!-- KPI ⑤: CFTC MACRO PROXY -->
-            <div class="bg-stone-950 border border-stone-800 p-4 rounded-xl shadow-inner border-l-4 border-l-fuchsia-500 flex flex-col justify-between lg:col-span-1 col-span-2">
-                <span class="text-[10px] text-fuchsia-400 font-bold block tracking-wider">MACRO WHALE LONG</span>
-                <div id="kpi-cftc" class="text-xl sm:text-2xl font-mono font-black text-fuchsia-400 mt-1">---</div>
-                <div class="text-xs text-stone-500 font-mono mt-2 pt-2 border-t border-stone-800">Report Date: <span id="kpi-cftc-date" class="text-stone-300 font-bold font-sans">---</span></div>
-            </div>
-        </div>
-    </main>
+    </div>
 
     <script>
-        const app = {
-            hrChart: null, slopeChart: null, csChart: null, liqChart: null, cftcChart: null,
-            xMonths: Array.from({length: 25}, (_, i) => i),
-            rawHistoryDocuments: [],
-
-            init() {
-                this.initCharts();
-                this.useSimulation('normal');
-                this.bindChartInteractions();
-            },
-
-            initCharts() {
-                const commonXAxisOptions = {
-                    display: true, grid: { color: 'rgba(120, 113, 108, 0.05)' },
-                    ticks: { color: '#78716c', font: { size: 9 }, maxRotation: 45, minRotation: 45, maxTicksLimit: 10 }
-                };
-
-                this.hrChart = new Chart(document.getElementById('hrChart').getContext('2d'), {
-                    type: 'line', data: { labels: [], datasets: [
-                        { label: '遠月平均(12-24M)', data: [], borderColor: '#f5f5f4', borderWidth: 2, pointRadius: 1, tension: 0.2 },
-                        { label: '期近平均(0-11M)', data: [], borderColor: '#78716c', borderWidth: 1.5, borderDash: [2, 2], pointRadius: 0, tension: 0.2 },
-                        { label: '採算臨界線', data: [], borderColor: 'rgba(239, 68, 68, 0.4)', borderDash: [4, 4], borderWidth: 1, pointRadius: 0 }
-                    ]}, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#a8a29e', font: { size: 9 } } } }, scales: { x: commonXAxisOptions, y: { min: 5.5, max: 9.0, ticks: { color: '#a8a29e', font: { size: 10 } } } } }
-                });
-
-                this.slopeChart = new Chart(document.getElementById('slopeChart').getContext('2d'), {
-                    type: 'line', data: { labels: [], datasets: [
-                        { label: '遠月傾き(12-24M)', data: [], borderColor: '#fbbf24', borderWidth: 2, pointRadius: 2, tension: 0.1 },
-                        { label: '期近傾き(0-11M)', data: [], borderColor: '#78716c', borderWidth: 1.5, borderDash: [2, 2], pointRadius: 0, tension: 0.1 },
-                        { label: 'フラット臨界線', data: [], borderColor: 'rgba(239, 68, 68, 0.4)', borderDash: [4, 4], borderWidth: 1, pointRadius: 0 }
-                    ]}, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#a8a29e', font: { size: 9 } } } }, scales: { x: commonXAxisOptions, y: { min: -0.20, max: 0.20, ticks: { color: '#a8a29e', font: { size: 10 } } } } }
-                });
-
-                this.csChart = new Chart(document.getElementById('crossSectionChart').getContext('2d'), {
-                    type: 'line', data: { labels: this.xMonths.map(m => `${m}M`), datasets: [
-                        { label: 'PJM (AI特区)', data: [], borderColor: '#ea580c', backgroundColor: 'rgba(234, 88, 12, 0.15)', borderWidth: 2, pointRadius: 3, fill: true },
-                        { label: 'ERCOT (一般)', data: [], borderColor: '#06b6d4', backgroundColor: 'rgba(6, 182, 212, 0.05)', borderWidth: 2, borderDash: [4, 4], pointRadius: 2, fill: true }
-                    ]}, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#a8a29e', font: { size: 10 } } } }, scales: { x: { ticks: { color: '#a8a29e', font: { size: 10 } } }, y: { min: 4.5, max: 9.5, ticks: { color: '#a8a29e', font: { size: 10 } } } } }
-                });
-
-                this.liqChart = new Chart(document.getElementById('liqChart').getContext('2d'), {
-                    type: 'line', data: { labels: [], datasets: [
-                        { type: 'line', label: '遠月建玉(OI)', data: [], borderColor: '#a855f7', backgroundColor: '#a855f7', borderWidth: 2, pointRadius: 2, tension: 0.1, yAxisID: 'y' },
-                        { type: 'bar', label: '遠月出来高(Vol)', data: [], backgroundColor: 'rgba(168, 85, 247, 0.3)', borderColor: 'rgba(168, 85, 247, 0.6)', borderWidth: 1, yAxisID: 'y1' }
-                    ]}, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#a8a29e', font: { size: 9 } } } }, scales: { 
-                        x: commonXAxisOptions, 
-                        y: { type: 'linear', display: true, position: 'left', min: 0, suggestedMax: 4000, ticks: { color: '#a8a29e', font: { size: 10 } }, grid: { color: 'rgba(120, 113, 108, 0.1)' } },
-                        y1: { type: 'linear', display: true, position: 'right', min: 0, suggestedMax: 10, ticks: { color: '#a8a29e', font: { size: 10 } }, grid: { drawOnChartArea: false } }
-                    } }
-                });
-
-                this.cftcChart = new Chart(document.getElementById('cftcChart').getContext('2d'), {
-                    type: 'line', data: { labels: [], datasets: [
-                        { label: 'マクロ実需＆SD ロング総量', data: [], borderColor: '#d946ef', backgroundColor: 'rgba(217, 70, 239, 0.15)', borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3 }
-                    ]}, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#a8a29e', font: { size: 9 } } } }, scales: { 
-                        x: commonXAxisOptions, 
-                        y: { min: 0, suggestedMax: 400000, ticks: { color: '#a8a29e', font: { size: 10 } }, grid: { color: 'rgba(120, 113, 108, 0.1)' } }
-                    } }
-                });
-            },
-
-            bindChartInteractions() {
-                const syncCrossSection = (evt, chartInstance) => {
-                    const points = chartInstance.getElementsAtEventForMode(evt, 'index', { intersect: false }, true);
-                    if (points.length > 0 && this.rawHistoryDocuments.length > 0) {
-                        this.updateCrossSectionFromHistory(points[0].index);
-                    }
-                };
-                document.getElementById('slopeChart').onclick = (evt) => syncCrossSection(evt, this.slopeChart);
-                document.getElementById('liqChart').onclick = (evt) => syncCrossSection(evt, this.liqChart);
-                document.getElementById('cftcChart').onclick = (evt) => syncCrossSection(evt, this.cftcChart);
-            },
-
-            calcLinearRegression(xArr, yArr) {
-                const n = xArr.length;
-                let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-                for (let i = 0; i < n; i++) { sumX+=xArr[i]; sumY+=yArr[i]; sumXY+=xArr[i]*yArr[i]; sumXX+=xArr[i]*xArr[i]; }
-                const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-                const intercept = (sumY - slope * sumX) / n;
-                return { slope, intercept };
-            },
-
-            async loadLiveDatabase() {
-                const projectId = document.getElementById('gcp-project-id').value;
-                if (!projectId) { alert("GCPプロジェクトIDを入力してください。"); return; }
-                const btn = document.querySelector('button[onclick="app.loadLiveDatabase()"]');
-                btn.textContent = "同期中...";
-                
-                const restUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/canary_logs?orderBy=timestamp_jst%20asc`;
-                try {
-                    const res = await fetch(restUrl);
-                    const data = await res.json();
-                    if(!data.documents) { alert("データベースが空です。"); btn.textContent = "📡 同期"; return; }
-                    
-                    this.rawHistoryDocuments = data.documents.map(d => {
-                        const f = d.fields;
-                        let curveObj = {};
-                        const curveDataField = f.curve_data || f.curve; 
-                        if (curveDataField?.mapValue?.fields) {
-                            for (let k in curveDataField.mapValue.fields) {
-                                curveObj[k] = parseFloat(curveDataField.mapValue.fields[k].doubleValue || curveDataField.mapValue.fields[k].integerValue);
-                            }
-                        }
-                        let rawDate = f.timestamp_jst ? f.timestamp_jst.stringValue : (f.timestamp ? f.timestamp.stringValue : "");
-                        
-                        let near_slope = 0;
-                        let near_x = [], near_y = [];
-                        if (Object.keys(curveObj).length > 0) {
-                            for(let i=0; i<=11; i++) {
-                                if(curveObj[`pjm_hr_${i}m`] !== undefined) { near_x.push(i); near_y.push(curveObj[`pjm_hr_${i}m`]); }
-                            }
-                            if(near_x.length > 2) { near_slope = this.calcLinearRegression(near_x, near_y).slope; }
-                        }
-
-                        const oi_total = f.far_oi_total ? parseInt(f.far_oi_total.integerValue || f.far_oi_total.doubleValue || 0) : 0;
-                        const vol_total = f.far_vol_total ? parseInt(f.far_vol_total.integerValue || f.far_vol_total.doubleValue || 0) : 0;
-                        const cftc_whale = f.cftc_whale_long ? parseInt(f.cftc_whale_long.integerValue || f.cftc_whale_long.doubleValue || 0) : 0;
-                        const cftc_dt = f.cftc_date ? f.cftc_date.stringValue : "N/A";
-
-                        return {
-                            timestamp_raw: rawDate, date_short: rawDate ? rawDate.substring(5, 10) : "N/A",
-                            slope: f.slope ? parseFloat(f.slope.doubleValue || f.slope.integerValue) : 0, near_slope: near_slope,
-                            band_mean_hr: f.band_mean_hr ? parseFloat(f.band_mean_hr.doubleValue || f.band_mean_hr.integerValue) : 0,
-                            band_mean_near_hr: f.band_mean_near_hr ? parseFloat(f.band_mean_near_hr.doubleValue || f.band_mean_near_hr.integerValue) : 7.0,
-                            band_mean_spread: f.band_mean_spread ? parseFloat(f.band_mean_spread.doubleValue || f.band_mean_spread.integerValue) : 0,
-                            far_oi_total: oi_total, far_vol_total: vol_total,
-                            cftc_whale_long: cftc_whale, cftc_date: cftc_dt,
-                            state: f.state ? f.state.stringValue : "Unknown", curve: curveObj
-                        };
-                    });
-                    this.renderLiveHistory();
-                    btn.textContent = "✅ 同期完了";
-                    setTimeout(() => btn.textContent = "📡 実戦データ同期", 3000);
-                } catch (err) { alert(`通信エラー: ${err.message}`); btn.textContent = "📡 同期"; }
-            },
-
-            renderLiveHistory() {
-                const displayData = this.rawHistoryDocuments.slice(-60);
-                const labels = displayData.map(d => d.date_short);
-                
-                this.hrChart.data.labels = labels; this.hrChart.data.datasets[0].data = displayData.map(d => d.band_mean_hr); this.hrChart.data.datasets[1].data = displayData.map(d => d.band_mean_near_hr); this.hrChart.data.datasets[2].data = Array(displayData.length).fill(7.0); this.hrChart.update();
-                this.slopeChart.data.labels = labels; this.slopeChart.data.datasets[0].data = displayData.map(d => d.slope); this.slopeChart.data.datasets[1].data = displayData.map(d => d.near_slope); this.slopeChart.data.datasets[2].data = Array(displayData.length).fill(0); this.slopeChart.update();
-
-                const volumes = displayData.map(d => d.far_vol_total);
-                this.liqChart.options.scales.y1.max = Math.ceil(Math.max(...volumes, 10) * 1.2); 
-                this.liqChart.data.labels = labels; this.liqChart.data.datasets[0].data = displayData.map(d => d.far_oi_total); this.liqChart.data.datasets[1].data = volumes; this.liqChart.update();
-                
-                const cftcData = displayData.map(d => d.cftc_whale_long);
-                this.cftcChart.options.scales.y.max = Math.ceil(Math.max(...cftcData, 100000) * 1.2);
-                this.cftcChart.data.labels = labels;
-                this.cftcChart.data.datasets[0].data = cftcData;
-                this.cftcChart.update();
-
-                this.updateCrossSectionFromHistory(displayData.length - 1);
-            },
-
-            updateCrossSectionFromHistory(index) {
-                const displayData = this.rawHistoryDocuments.slice(-60);
-                if(!displayData[index]) return;
-                const dayData = displayData[index];
-                
-                const pjmY = this.xMonths.map(m => dayData.curve[`pjm_hr_${m}m`] || 0);
-                const ercotY = this.xMonths.map(m => dayData.curve[`ercot_hr_${m}m`] || 0);
-                this.csChart.data.datasets[0].data = pjmY; this.csChart.data.datasets[1].data = ercotY; this.csChart.update();
-                
-                document.getElementById('kpi-near-hr').textContent = dayData.band_mean_near_hr.toFixed(2);
-                document.getElementById('kpi-hr').textContent = dayData.band_mean_hr.toFixed(2);
-                document.getElementById('kpi-slope').textContent = (dayData.slope >= 0 ? '+' : '') + dayData.slope.toFixed(4);
-                document.getElementById('kpi-near-slope').textContent = (dayData.near_slope >= 0 ? '+' : '') + dayData.near_slope.toFixed(4);
-                document.getElementById('kpi-spread').textContent = dayData.band_mean_spread.toFixed(1) + "%";
-                document.getElementById('kpi-spread').className = dayData.band_mean_spread > 15 ? "text-2xl sm:text-3xl font-mono font-black text-cyan-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
-                
-                document.getElementById('kpi-oi').textContent = dayData.far_oi_total.toLocaleString();
-                document.getElementById('kpi-vol').textContent = dayData.far_vol_total.toLocaleString();
-                document.getElementById('kpi-oi').className = dayData.far_oi_total > 500 ? "text-2xl sm:text-3xl font-mono font-black text-purple-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
-
-                document.getElementById('kpi-cftc').textContent = dayData.cftc_whale_long > 0 ? dayData.cftc_whale_long.toLocaleString() : "---";
-                document.getElementById('kpi-cftc-date').textContent = dayData.cftc_date !== "Simulated" ? dayData.cftc_date : "N/A (Wait for update)";
-                document.getElementById('kpi-cftc').className = dayData.cftc_whale_long > 100000 ? "text-xl sm:text-2xl font-mono font-black text-fuchsia-400 mt-1" : "text-xl sm:text-2xl font-mono font-black text-rose-500 mt-1";
-
-                const adv = document.getElementById('kpi-status');
-                const acc = document.getElementById('status-accent');
-                adv.textContent = dayData.state;
-                if (dayData.state.includes("🟢")) { adv.className = "text-lg sm:text-xl font-bold text-emerald-400 ml-3 leading-relaxed transition-colors duration-500"; acc.className = "absolute top-0 left-0 w-2 h-full bg-emerald-500 transition-colors duration-500"; }
-                else if (dayData.state.includes("🟡")) { adv.className = "text-lg sm:text-xl font-bold text-amber-400 ml-3 leading-relaxed transition-colors duration-500"; acc.className = "absolute top-0 left-0 w-2 h-full bg-amber-500 transition-colors duration-500"; }
-                else if (dayData.state.includes("🟠")) { adv.className = "text-lg sm:text-xl font-bold text-orange-400 ml-3 leading-relaxed transition-colors duration-500"; acc.className = "absolute top-0 left-0 w-2 h-full bg-orange-500 transition-colors duration-500"; }
-                else if (dayData.state.includes("🔴")) { adv.className = "text-lg sm:text-xl font-bold text-rose-500 ml-3 leading-relaxed transition-colors duration-500"; acc.className = "absolute top-0 left-0 w-2 h-full bg-rose-500 transition-colors duration-500"; }
-            },
-
-            useSimulation(mode) {
-                this.rawHistoryDocuments = [];
-                let hrFar = [], hrNear = [], ts = [], tsNear = [], pjmY = [], ercotY = [], oi = [], vol = [], cftc = [], spread = 0, state = "";
-                let dummyDates = []; let d = new Date(); d.setDate(d.getDate() - 60);
-                for(let i=0; i<60; i++) { d.setDate(d.getDate() + 1); dummyDates.push(`${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`); }
-
-                if (mode === 'normal') {
-                    for(let i=0; i<60; i++) { hrFar.push(7.9); hrNear.push(7.1); ts.push(0.05); tsNear.push(0.02); oi.push(2500+Math.random()*200); vol.push(150); cftc.push(350000+Math.random()*10000); }
-                    pjmY = this.xMonths.map(x => x >= 12 ? 7.4 + (x-12)*0.05 : 6.8 + x*0.02); ercotY = this.xMonths.map(x => x >= 12 ? 6.1 + (x-12)*0.02 : 5.8 + x*0.01);
-                    spread = 25.0; state = "🟢 【正常】AIプレミアム＆マクロ実需OI 堅調維持";
-                } else if (mode === 'noise') {
-                    for(let i=0; i<60; i++) { hrFar.push(6.8); hrNear.push(6.5); ts.push(0.05); tsNear.push(0.02); oi.push(2400); vol.push(120); cftc.push(300000); }
-                    pjmY = this.xMonths.map(x => x >= 12 ? 7.2 + (x-12)*0.05 : 6.6 + x*0.02); ercotY = this.xMonths.map(x => x >= 12 ? 5.9 + (x-12)*0.02 : 5.6 + x*0.01);
-                    spread = 19.2; state = "🟡 【流動性低下】価格維持するもマクロ実需建玉減少(警戒)";
-                } else if (mode === 'vacuum') {
-                    for(let i=0; i<60; i++) { hrFar.push(7.5); hrNear.push(7.2); ts.push(0.01); tsNear.push(0.03); oi.push(1500-i*20); vol.push(50); cftc.push(200000-i*2000); }
-                    pjmY = this.xMonths.map(x => x >= 12 ? 7.0 + (x-12)*0.01 : 6.5 + x*0.03); ercotY = this.xMonths.map(x => x >= 12 ? 6.1 + (x-12)*0.01 : 5.7 + x*0.01);
-                    spread = 14.7; state = "🟠 【真空状態】流動性枯渇・スプレッド急縮小";
-                } else if (mode === 'collapse') {
-                    for(let i=0; i<60; i++) { hrFar.push(6.2); hrNear.push(6.8); ts.push(-0.08); tsNear.push(-0.02); oi.push(100); vol.push(10); cftc.push(80000); }
-                    pjmY = this.xMonths.map(x => x >= 12 ? 6.4 - (x-12)*0.08 : 7.0 - x*0.02); ercotY = this.xMonths.map(x => 5.9);
-                    spread = 4.2; state = "🔴 【崩壊確定】OI消失・マクロ実需逃避。バブル完全崩壊";
-                }
-                
-                this.hrChart.data.labels = dummyDates; this.hrChart.data.datasets[0].data = hrFar; this.hrChart.data.datasets[1].data = hrNear; this.hrChart.data.datasets[2].data = Array(60).fill(7.0); this.hrChart.update();
-                this.slopeChart.data.labels = dummyDates; this.slopeChart.data.datasets[0].data = ts; this.slopeChart.data.datasets[1].data = tsNear; this.slopeChart.data.datasets[2].data = Array(60).fill(0); this.slopeChart.update();
-                this.csChart.data.datasets[0].data = pjmY; this.csChart.data.datasets[1].data = ercotY; this.csChart.update();
-                this.liqChart.options.scales.y1.max = Math.ceil(Math.max(...vol, 10) * 1.2);
-                this.liqChart.data.labels = dummyDates; this.liqChart.data.datasets[0].data = oi; this.liqChart.data.datasets[1].data = vol; this.liqChart.update();
-                
-                this.cftcChart.options.scales.y.max = Math.ceil(Math.max(...cftc, 100000) * 1.2);
-                this.cftcChart.data.labels = dummyDates; this.cftcChart.data.datasets[0].data = cftc; this.cftcChart.update();
-
-                document.getElementById('kpi-near-hr').textContent = hrNear[59].toFixed(2);
-                document.getElementById('kpi-hr').textContent = hrFar[59].toFixed(2);
-                document.getElementById('kpi-slope').textContent = (ts[59] >= 0 ? '+' : '') + ts[59].toFixed(4);
-                document.getElementById('kpi-near-slope').textContent = (tsNear[59] >= 0 ? '+' : '') + tsNear[59].toFixed(4);
-                document.getElementById('kpi-spread').textContent = spread.toFixed(1) + "%";
-                document.getElementById('kpi-spread').className = spread > 15 ? "text-2xl sm:text-3xl font-mono font-black text-cyan-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
-                document.getElementById('kpi-oi').textContent = Math.floor(oi[59]).toLocaleString();
-                document.getElementById('kpi-vol').textContent = Math.floor(vol[59]).toLocaleString();
-                document.getElementById('kpi-oi').className = oi[59] > 500 ? "text-2xl sm:text-3xl font-mono font-black text-purple-400 mt-1" : "text-2xl sm:text-3xl font-mono font-black text-rose-500 mt-1";
-                
-                document.getElementById('kpi-cftc').textContent = Math.floor(cftc[59]).toLocaleString();
-                document.getElementById('kpi-cftc-date').textContent = "Simulated";
-                document.getElementById('kpi-cftc').className = cftc[59] > 100000 ? "text-xl sm:text-2xl font-mono font-black text-fuchsia-400 mt-1" : "text-xl sm:text-2xl font-mono font-black text-rose-500 mt-1";
-
-                const adv = document.getElementById('kpi-status'); const acc = document.getElementById('status-accent');
-                adv.textContent = state;
-                if (state.includes("🟢")) { adv.className = "text-lg sm:text-xl font-bold text-emerald-400 ml-3 leading-relaxed transition-colors duration-500"; acc.className = "absolute top-0 left-0 w-2 h-full bg-emerald-500 transition-colors duration-500"; }
-                else if (state.includes("🟡")) { adv.className = "text-lg sm:text-xl font-bold text-amber-400 ml-3 leading-relaxed transition-colors duration-500"; acc.className = "absolute top-0 left-0 w-2 h-full bg-amber-500 transition-colors duration-500"; }
-                else if (state.includes("🟠")) { adv.className = "text-lg sm:text-xl font-bold text-orange-400 ml-3 leading-relaxed transition-colors duration-500"; acc.className = "absolute top-0 left-0 w-2 h-full bg-orange-500 transition-colors duration-500"; }
-                else if (state.includes("🔴")) { adv.className = "text-lg sm:text-xl font-bold text-rose-500 ml-3 leading-relaxed transition-colors duration-500"; acc.className = "absolute top-0 left-0 w-2 h-full bg-rose-500 transition-colors duration-500"; }
-            }
+        // Placeholder data representing the logic calculated by Canary Monitor
+        const mockData = {
+            "CEG": {price: 345.2, change: 1.2}, "VRT": {price: 120.5, change: 0.8},
+            "ETN": {price: 355.0, change: 0.5}, "EQIX": {price: 850.0, change: -1.2}, // EQIX不穏
+            "SMCI": {price: 680.0, change: -2.1}, "ANET": {price: 410.0, change: 1.1},
+            "CRWV": {price: 28.5, change: -3.5}, "NBIS": {price: 12.0, change: -1.0}
         };
-        document.addEventListener('DOMContentLoaded', () => app.init());
+
+        function render() {
+            const tiers = {
+                't1': ['CEG', 'VRT', 'ETN', 'EQIX'],
+                't15': ['SMCI', 'ANET'],
+                't2': ['CRWV', 'NBIS']
+            };
+
+            for (const [id, tickers] of Object.entries(tiers)) {
+                const container = document.getElementById(id + '-list');
+                tickers.forEach(t => {
+                    const d = mockData[t];
+                    container.innerHTML += `
+                        <div class="flex justify-between p-3 bg-stone-950 rounded-lg hover:border hover:border-stone-700 transition">
+                            <span class="font-bold">${t}</span>
+                            <span class="${d.change >= 0 ? 'text-emerald-400' : 'text-rose-400'} font-mono">
+                                ${d.change > 0 ? '+' : ''}${d.change}%
+                            </span>
+                        </div>`;
+                });
+            }
+        }
+        render();
     </script>
 </body>
 </html>
