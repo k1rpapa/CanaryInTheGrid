@@ -1,308 +1,131 @@
-import os
+import yfinance as yf
 import json
-import time
+import datetime
+import os
 import requests
-import gspread
-import statistics
-import sys
-# cloudscraperのインポートを追加 (要 pip install cloudscraper)
-import cloudscraper
-from google.oauth2.service_account import Credentials
-from google.cloud import firestore
-from datetime import datetime, timezone, timedelta
 
-# =========================================================================
-# CanaryInTheGrid v5.3 - Phase 1&2: Cloudflare Bypass (Cloudscraper)
-# =========================================================================
+# --- 監視対象の階層構造（Canary Radar v10.0 構成） ---
+INFRA_TIERS = {
+    'TIER_1': ['CEG', 'VRT', 'ETN', 'EQIX'],        # Foundation (物理基盤)
+    'TIER_1_5': ['SMCI', 'ANET'],                   # Compute & Fabric (演算・接続)
+    'TIER_2': ['CRWV', 'NBIS'],                     # Velocity (AIクラウド)
+    'TIER_3': ['FCX', 'SCCO', 'CCJ', 'URA'],        # Upstream (資源・素材)
+    'TIER_4': ['NOW', 'WDAY', 'CRM', 'SAP', 'VEEV', 
+               'HUBS', 'SNOW', 'TDC', 'ZS', 'MDB', 
+               'PAYC', 'INTU', 'ADBE']              # True Asset (データ資源・関所)
+}
 
-ALL_MONTHS = list(range(0, 25))
-FAR_MONTHS = list(range(12, 25))
-
-def fetch_with_backoff(url, headers=None, max_retries=5):
-    delay = 1
-    # requests の代わりに cloudscraper インスタンスを生成
-    scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'mobile': False})
-    
-    for attempt in range(max_retries):
-        try:
-            # scraper.get を使用してCloudflareのボット検知を突破
-            response = scraper.get(url, headers=headers, timeout=15)
-            response.raise_for_status()
-            return response
-        except Exception as e:
-            if attempt == max_retries - 1:
-                print(f"[-] Fatal: API Request failed after {max_retries} attempts: {e}")
-                # HTTPステータスコードが取得できれば表示
-                if hasattr(e, 'response') and e.response is not None:
-                     print(f"[-] Response Status: {e.response.status_code}")
-                     print(f"[-] Response Text (first 200 chars): {e.response.text[:200]}")
-                raise e
-            print(f"[*] Retry {attempt + 1}/{max_retries} due to {e}. Waiting {delay}s...")
-            time.sleep(delay)
-            delay *= 2
-
-def safe_int(value):
-    if not value or value == '-': return 0
-    if isinstance(value, str):
-        return int(value.replace(',', '').split('.')[0])
-    return int(value)
-
-def fetch_cftc_macro_proxy():
-    print("[*] Infiltrating CFTC Socrata API for Macro Proxy (Henry Hub)...")
-    url = "https://publicreporting.cftc.gov/resource/72hh-3qpy.json"
-    macro_proxy_code = "023651" 
-    try:
-        query = f"{url}?cftc_contract_market_code={macro_proxy_code}&$order=report_date_as_yyyy_mm_dd DESC&$limit=1"
-        response = requests.get(query, timeout=10) # CFTCは通常のrequestsでOK
+def fetch_market_data():
+    all_tickers = []
+    for tickers in INFRA_TIERS.values():
+        all_tickers.extend(tickers)
         
-        if response.status_code == 200 and len(response.json()) > 0:
-            data = response.json()[0]
-            report_date = data.get("report_date_as_yyyy_mm_dd", "N/A")[:10]
-            pm_long = float(data.get("prod_merc_positions_long", 0))
-            sd_long = float(data.get("swap_positions_long", 0))
-            whale_long_total = pm_long + sd_long
-            
-            print(f"[+] CFTC Macro Proxy Identified (Date: {report_date}): {whale_long_total} contracts")
-            return whale_long_total, report_date
-        else:
-            raise Exception(f"API returned empty data or status code {response.status_code}.")
-    except Exception as e:
-        print(f"[!] CFTC Fetch Error: {e}. Engaging simulated ledger.")
-        return 12500, "Simulated"
-
-def fetch_cme_curve(product_id, default_start_price, default_step):
-    print(f"[*] Extracting Price, Volume & OI from Product ID: {product_id}...")
-    cme_url = f"https://www.cmegroup.com/CmeWS/mvc/Quotes/Future/{product_id}/G"
-    headers = {
-        # ユーザーエージェントなどを本物のブラウザに偽装
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://www.cmegroup.com/"
-    }
-    curve = {}
+    print(f"[*] Fetching Infrastructure Snapshot: {all_tickers}")
     try:
-        response = fetch_with_backoff(cme_url, headers=headers)
-        data = response.json()
-        if len(data) < 25: raise Exception(f"Insufficient liquidity ({len(data)} months).")
-        for idx, m in enumerate(ALL_MONTHS):
-            month_data = data[idx]
-            price = float(month_data.get('last', 0)) or float(month_data.get('priorSettle', 0))
-            curve[m] = {
-                'price': price if price > 0.5 else (default_start_price + idx * default_step),
-                'volume': safe_int(month_data.get('volume', 0)),
-                'oi': safe_int(month_data.get('openInterest', 0))
-            }
-        print(f"[+] CME Extraction Successful for Product ID: {product_id}")
-        return curve
+        data = yf.download(all_tickers, period="5d", group_by="ticker", auto_adjust=False)
     except Exception as e:
-        print(f"[-] CME Extraction Error for {product_id}: {e}")
+        print(f"[!] Error fetching data: {e}")
         return None
 
-def generate_regional_power_curves(gas_curve):
-    pjm_curve, ercot_curve = {}, {}
-    for m in ALL_MONTHS:
-        pjm_base_hr = 7.6 + ((m - 12) * 0.05) if m >= 12 else 7.3 + (m * 0.02)
-        ercot_base_hr = 6.2 + ((m - 12) * 0.02) if m >= 12 else 6.0 + (m * 0.01)
-        dummy_oi = max(0, 500 - (m * 15)) 
-        pjm_curve[m] = {'price': round(gas_curve[m]['price'] * pjm_base_hr, 2), 'volume': 0, 'oi': dummy_oi}
-        ercot_curve[m] = {'price': round(gas_curve[m]['price'] * ercot_base_hr, 2), 'volume': 0, 'oi': dummy_oi}
-    return pjm_curve, ercot_curve
+    results = {}
+    for ticker in all_tickers:
+        try:
+            ticker_data = data if len(all_tickers) == 1 else data[ticker]
+            closes = ticker_data['Close'].dropna().values
+            volumes = ticker_data['Volume'].dropna().values
+            
+            if len(closes) >= 2:
+                latest = closes[-1]
+                prev = closes[-2]
+                change_pct = ((latest - prev) / prev) * 100
+                
+                # ボリューム・サージ（直近と過去数日の平均との比率）を簡易算出
+                avg_vol = sum(volumes[:-1]) / len(volumes[:-1]) if len(volumes) > 1 else 1
+                vol_surge = (volumes[-1] / avg_vol) if avg_vol > 0 else 1.0
 
-def fetch_market_data_with_fallback():
-    # データ取得の成否フラグ
-    fallback_engaged = False
-    
-    gas_curve = fetch_cme_curve("425", 2.50, 0.02)
-    if not gas_curve:
-        fallback_engaged = True
-        gas_curve = {m: {'price': 2.50 + (m * 0.02), 'volume': 0, 'oi': 0} for m in ALL_MONTHS}
-        
-    pjm_curve = fetch_cme_curve("324", 45.0, 0.5)
-    ercot_curve = fetch_cme_curve("838", 35.0, 0.2)
-    
-    if not pjm_curve or not ercot_curve:
-        fallback_engaged = True
-        print("[!] Tactical Fallback (Modeling) engaged. Failed to bypass CME WAF.")
-        pjm_curve, ercot_curve = generate_regional_power_curves(gas_curve)
-    
-    return gas_curve, pjm_curve, ercot_curve, fallback_engaged
+                results[ticker] = {
+                    "price": round(float(latest), 2),
+                    "change": round(float(change_pct), 2),
+                    "vol_surge": round(float(vol_surge), 2)
+                }
+            else:
+                results[ticker] = {"price": 0.0, "change": 0.0, "vol_surge": 1.0}
+        except Exception as e:
+            print(f"[!] Could not process {ticker}: {e}")
+            
+    return results
 
-def calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, cftc_date, fallback_engaged):
-    print("[*] Calculating Phase 1-3 Unified Metrics...")
-    pjm_all_hrs, ercot_all_hrs, spreads = [], [], []
-    curve_data_map = {}
-    pjm_far_oi_total = 0
-    pjm_far_vol_total = 0
-    
-    for m in ALL_MONTHS:
-        g_price = gas_curve[m]['price']
-        p_pjm = pjm_curve[m]['price']
-        p_ercot = ercot_curve[m]['price']
-        
-        hr_pjm = p_pjm / g_price if g_price > 0.1 else 7.5
-        hr_ercot = p_ercot / g_price if g_price > 0.1 else 6.0
-        
-        if hr_pjm < 1.0 or hr_pjm > 30.0: hr_pjm = 7.5
-        if hr_ercot < 1.0 or hr_ercot > 30.0: hr_ercot = 6.0
-        
-        pjm_all_hrs.append(hr_pjm)
-        ercot_all_hrs.append(hr_ercot)
-        spread_pct = ((hr_pjm - hr_ercot) / hr_ercot) * 100 if hr_ercot > 0 else 0
-        spreads.append(spread_pct)
-        
-        if m in FAR_MONTHS:
-            pjm_far_oi_total += pjm_curve[m]['oi']
-            pjm_far_vol_total += pjm_curve[m]['volume']
-        
-        curve_data_map[f"pjm_hr_{m}m"] = round(hr_pjm, 4)
-        curve_data_map[f"ercot_hr_{m}m"] = round(hr_ercot, 4)
-        curve_data_map[f"pjm_oi_{m}m"] = pjm_curve[m]['oi']
-        curve_data_map[f"pjm_vol_{m}m"] = pjm_curve[m]['volume']
-        
-    pjm_far_hrs = pjm_all_hrs[12:25]
-    spreads_far = spreads[12:25]
-    
-    band_mean_far_hr = statistics.mean(pjm_far_hrs)
-    band_mean_near_hr = statistics.mean(pjm_all_hrs[0:12])
-    band_mean_far_spread = statistics.mean(spreads_far)
-    slope, _ = statistics.linear_regression(FAR_MONTHS, pjm_far_hrs)
-    
-    LIQUIDITY_WARNING = pjm_far_oi_total < 500
-    WHALE_WARNING = cftc_whale_long < 100000 
-    
-    # フォールバック発動時は状態を明示
-    if fallback_engaged:
-        state = "⚠️ 【CME DATA BLOCKED】 取得失敗・シミュレーション値表示"
-    elif band_mean_far_hr < 7.0 and slope < 0 and LIQUIDITY_WARNING and WHALE_WARNING:
-        state = "🔴 【崩壊確定】OI消失・マクロ実需逃避。バブル完全崩壊"
-    elif slope < 0 or (band_mean_far_spread < 15.0 and LIQUIDITY_WARNING):
-        state = "🟠 【真空状態】流動性枯渇・スプレッド急縮小"
-    elif band_mean_far_hr < 7.0:
-        state = "🟡 【偽陽性】水準低下するもOI維持(ノイズ)"
-    elif LIQUIDITY_WARNING or WHALE_WARNING:
-        state = "🟡 【流動性低下】価格維持するもマクロ実需建玉減少(警戒)"
+def calculate_tier_averages(data_details):
+    tier_averages = {}
+    for tier_name, tickers in INFRA_TIERS.items():
+        changes = [data_details[t]["change"] for t in tickers if t in data_details]
+        avg = sum(changes) / len(changes) if changes else 0
+        tier_averages[tier_name] = round(avg, 2)
+    return tier_averages
+
+def run_diagnostic(tier_averages):
+    t1 = tier_averages.get('TIER_1', 0)
+    t2 = tier_averages.get('TIER_2', 0)
+    t3 = tier_averages.get('TIER_3', 0)
+    t4 = tier_averages.get('TIER_4', 0)
+
+    # 1. 資金ローテーション（インフラ安・データ資源高）
+    if t1 < -1.0 and t2 < -1.0 and t4 > 1.0:
+        return "🟢 【健全なローテーション】インフラ売却・データ資源買い。テクノロジー全体の崩壊ではない"
+
+    # 2. 真の全面崩壊（インフラもデータ資源も全て売られる相関1のパニック）
+    elif t1 < -1.0 and t2 < -1.0 and t4 < -1.0:
+        return "🔴 【真のパニック崩壊】インフラからデータ要塞まで全リスク資産からの資金流出"
+
+    # 3. 最悪のシナリオ（資源高＋インフラ死滅）
+    elif t3 > 0 and t1 < -1.0 and t2 < -1.0:
+        return "🔴 【致命的崩壊】資源高騰下でのインフラ投資死滅。スタグフレーション"
+
+    # 4. データ資源の単独安（AIによる既存SaaSの破壊懸念）
+    elif t1 >= 0 and t4 < -1.0:
+        return "🟡 【AI破壊の恐れ】インフラは堅調だが、既存のデータ資源層(Tier 4)が売られている"
+
+    elif t1 >= 0 and t2 >= 0 and t4 >= 0:
+        return "🟢 【正常】インフラからデータ層まで資金が循環"
     else:
-        state = "🟢 【正常】AIプレミアム＆マクロ実需OI 堅調維持"
+        return "⚪ 【注視】各レイヤーで強弱が混在"
 
-    return {
-        "timestamp_jst": (datetime.now(timezone.utc) + timedelta(hours=9)).strftime('%Y-%m-%d %H:%M:%S'),
-        "slope": round(slope, 6),
-        "band_mean_hr": round(band_mean_far_hr, 4),
-        "band_mean_near_hr": round(band_mean_near_hr, 4),
-        "band_mean_spread": round(band_mean_far_spread, 2),
-        "far_oi_total": pjm_far_oi_total,
-        "far_vol_total": pjm_far_vol_total,
-        "cftc_whale_long": cftc_whale_long,
-        "cftc_date": cftc_date,
-        "state": state,
-        "curve_data": curve_data_map
+def send_line_messaging_api(message):
+    token = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
+    user_id = os.environ.get("LINE_USER_ID")
+    if not token or not user_id: return
+        
+    url = "https://api.line.me/v2/bot/message/push"
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {token}"}
+    data = {"to": user_id, "messages": [{"type": "text", "text": message}]}
+    requests.post(url, headers=headers, json=data)
+
+def main():
+    details = fetch_market_data()
+    if not details: return
+
+    tier_averages = calculate_tier_averages(details)
+    status_msg = run_diagnostic(tier_averages)
+
+    line_msg = f"⚠️ AIインフラ監視 v10.0\n判定: {status_msg}\n\n"
+    line_msg += f"■ T1 (物理): {tier_averages['TIER_1']}%\n"
+    line_msg += f"■ T2 (AI雲): {tier_averages['TIER_2']}%\n"
+    line_msg += f"■ T3 (資源): {tier_averages['TIER_3']}%\n"
+    line_msg += f"■ T4 (データ資源): {tier_averages['TIER_4']}%\n"
+    line_msg += f"\nダッシュボード:\nhttps://k1rpapa.github.io/aicollapse-canary-radar/"
+    
+    send_line_messaging_api(line_msg)
+
+    output_data = {
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "config": INFRA_TIERS,
+        "layers": tier_averages,
+        "status": status_msg,
+        "details": details
     }
 
-def dispatch_alert(metrics, discord_url, line_channel_token, line_user_id):
-    state = metrics['state']
-    
-    # 🔴, 🟠 または ⚠️ (ブロック時) にアラート発動
-    if "🔴" not in state and "🟠" not in state and "⚠️" not in state:
-        print(f"[*] Market Stable ({state}). No tactical alert dispatched.")
-        return
-
-    print("🚨 [CRITICAL] TRIGGERING TACTICAL ALERT! 🚨")
-    
-    message = f"""
-🚨 **CANARY TERMINAL ALERT** 🚨
-**STATUS:** {state}
-
-📊 **MARKET METRICS:**
-* **PJM Far HR (12-24M):** {metrics['band_mean_hr']}
-* **Premium Spread:** {metrics['band_mean_spread']}%
-* **Curve Slope:** {metrics['slope']}
-* **PJM Far OI (Liquidity):** {metrics['far_oi_total']}
-* **CFTC Whale Long:** {metrics['cftc_whale_long']} ({metrics['cftc_date']})
-
-🔗 **DASHBOARD:**
-https://k1rpapa.github.io/CanaryInTheGrid/
-"""
-
-    if discord_url:
-        try:
-            res = requests.post(discord_url, json={"content": message})
-            if res.status_code in [200, 204]: print("[+] Discord Alert Sent.")
-            else: print(f"[-] Discord Failed: {res.status_code} - {res.text}")
-        except Exception as e: print(f"[-] Discord Alert Exception: {e}")
-
-    if line_channel_token and line_user_id:
-        print("[*] Attempting to send LINE Alert...")
-        try:
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {line_channel_token.strip()}"
-            }
-            data = {
-                "to": line_user_id.strip(),
-                "messages": [{"type": "text", "text": message}]
-            }
-            res = requests.post("https://api.line.me/v2/bot/message/push", headers=headers, json=data)
-            
-            if res.status_code == 200: 
-                print("[+] LINE Messaging API Alert Sent Successfully.")
-            else:
-                error_msg = f"[-] LINE Alert Failed! Status: {res.status_code}, Response: {res.text}"
-                print(error_msg)
-                sys.exit(error_msg)
-                
-        except Exception as e: 
-            print(f"[-] LINE Alert Exception: {e}")
-            sys.exit(str(e))
-    else:
-        print("[-] LINE credentials not found. Skipping LINE alert.")
-
-def log_to_google_sheets(metrics, credentials_json_str, sheet_id):
-    try:
-        credentials_info = json.loads(credentials_json_str)
-        scopes = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-        credentials = Credentials.from_service_account_info(credentials_info, scopes=scopes)
-        gc = gspread.authorize(credentials)
-        worksheet = gc.open_by_key(sheet_id).sheet1
-        row_data = [
-            metrics["timestamp_jst"], metrics["band_mean_hr"], metrics["slope"],
-            metrics["band_mean_spread"], metrics["band_mean_near_hr"], 
-            metrics["far_oi_total"], metrics["far_vol_total"], 
-            metrics["cftc_whale_long"], metrics["state"]
-        ]
-        worksheet.append_row(row_data)
-    except Exception as e: print(f"[-] Sheets Logging Error: {e}")
-
-def log_to_cloud_firestore(metrics, credentials_json_str):
-    try:
-        credentials_info = json.loads(credentials_json_str)
-        credentials = Credentials.from_service_account_info(credentials_info)
-        db = firestore.Client(credentials=credentials, project=credentials_info['project_id'])
-        doc_id = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
-        db.collection("canary_logs").document(doc_id).set(metrics)
-    except Exception as e: print(f"[-] Firestore Logging Error: {e}")
-
+    with open('dashboard_data.json', 'w', encoding='utf-8') as f:
+        json.dump(output_data, f, ensure_ascii=False, indent=2)
+        
 if __name__ == "__main__":
-    GCP_SHEET_ID = os.getenv("GCP_SHEET_ID")
-    GCP_SERVICE_ACCOUNT_JSON = os.getenv("GCP_SERVICE_ACCOUNT_JSON")
-    DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL") 
-    
-    LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
-    LINE_USER_ID = os.getenv("LINE_USER_ID")
-    
-    if not GCP_SHEET_ID or not GCP_SERVICE_ACCOUNT_JSON:
-        print("[-] Fatal: Missing GCP environment variables.")
-        sys.exit(1)
-
-    cftc_whale_long, cftc_date = fetch_cftc_macro_proxy()
-    # 変更: fallback_engaged フラグを受け取る
-    gas_curve, pjm_curve, ercot_curve, fallback_engaged = fetch_market_data_with_fallback()
-    
-    metrics = calculate_macro_metrics(gas_curve, pjm_curve, ercot_curve, cftc_whale_long, cftc_date, fallback_engaged)
-    
-    dispatch_alert(metrics, DISCORD_WEBHOOK_URL, LINE_CHANNEL_ACCESS_TOKEN, LINE_USER_ID)
-    
-    log_to_google_sheets(metrics, GCP_SERVICE_ACCOUNT_JSON, GCP_SHEET_ID)
-    log_to_cloud_firestore(metrics, GCP_SERVICE_ACCOUNT_JSON)
-    
-    print("[+] Canary Monitor Execution Finished Successfully.")
+    main()
